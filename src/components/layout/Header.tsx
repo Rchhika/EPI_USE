@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Users, BarChart3, Network, Menu, X, Building } from 'lucide-react';
+import { logout } from '@/features/auth/api';
+import { useAuth } from '@/features/auth/useAuth';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: BarChart3 },
@@ -12,6 +14,8 @@ const navigation = [
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { queryClient } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -51,13 +55,18 @@ export default function Header() {
             })}
           </nav>
 
-          {/* User Profile */}
+          {/* Auth Actions */}
           <div className="hidden md:flex items-center space-x-3">
-            <div className="text-right">
-              <p className="text-sm font-medium text-foreground">Admin User</p>
-              <p className="text-xs text-muted-foreground">administrator</p>
-            </div>
-            <div className="h-8 w-8 rounded-full bg-gradient-secondary"></div>
+            <Button
+              variant="ghost"
+              onClick={async () => {
+                await logout();
+                await queryClient.invalidateQueries({ queryKey: ['me'] });
+                navigate('/login');
+              }}
+            >
+              Logout
+            </Button>
           </div>
 
           {/* Mobile menu button */}
@@ -98,13 +107,18 @@ export default function Header() {
             })}
             
             <div className="pt-3 mt-3 border-t border-border">
-              <div className="flex items-center space-x-3 px-3 py-2">
-                <div className="h-8 w-8 rounded-full bg-gradient-secondary"></div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">Admin User</p>
-                  <p className="text-xs text-muted-foreground">administrator</p>
-                </div>
-              </div>
+              <Button
+                variant="ghost"
+                className="w-full justify-start"
+                onClick={async () => {
+                  await logout();
+                  await queryClient.invalidateQueries({ queryKey: ['me'] });
+                  setMobileMenuOpen(false);
+                  navigate('/login');
+                }}
+              >
+                Logout
+              </Button>
             </div>
           </div>
         </div>

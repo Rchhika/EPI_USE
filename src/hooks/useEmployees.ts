@@ -1,123 +1,89 @@
-import { useState, useMemo } from 'react';
-import { Employee, EmployeeFilters, EmployeeSortConfig, EmployeePagination } from '@/types/employee';
-import { mockEmployees } from '@/data/mockEmployees';
+import { useMemo, useState } from 'react';
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  keepPreviousData, // <-- v5 helper
+} from '@tanstack/react-query';
+import {
+  listEmployees,
+  createEmployee,
+  updateEmployee,
+  deleteEmployee,
+} from '@/features/auth/employees/api';
+import type { Employee, EmployeeCreateInput, EmployeeUpdateInput } from '@/types/employee';
+
+type EmployeesResponse = {
+  data: Employee[];
+  total: number;  
+  page: number;
+  limit: number;
+};
 
 export function useEmployees() {
-  const [employees, setEmployees] = useState<Employee[]>(mockEmployees);
-  const [filters, setFilters] = useState<EmployeeFilters>({});
-  const [sort, setSort] = useState<EmployeeSortConfig>({ field: 'name', direction: 'asc' });
-  const [pagination, setPagination] = useState<EmployeePagination>({ page: 1, limit: 10, total: 0 });
+  const qc = useQueryClient();
 
-  const filteredAndSortedEmployees = useMemo(() => {
-    let result = [...employees];
+  const [filters, setFilters] = useState<Filters>({});
+  const [page, setPage] = useState(1);
+  const [limit] = useState(20);
 
-    // Apply filters
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
-      result = result.filter(emp => 
-        emp.name.toLowerCase().includes(searchLower) ||
-        emp.surname.toLowerCase().includes(searchLower) ||
-        emp.role.toLowerCase().includes(searchLower) ||
-        emp.email.toLowerCase().includes(searchLower)
-      );
-    }
+  const query = useQuery<EmployeesResponse>({
+    queryKey: ['employees', { page, limit, q: (filters.search ?? '').trim() }],
+    queryFn: () =>
+      listEmployees({
+        page,
+        limit,
+        q: (filters.search ?? '').trim() || undefined,
+        sort: '-createdAt',
+      }),
+    // v5 replacement for keepPreviousData: true
+    placeholderData: keepPreviousData,
+  });
 
-    if (filters.role) {
-      result = result.filter(emp => emp.role === filters.role);
-    }
+  const rows = query.data?.data ?? [];
 
-    if (filters.hasManager !== undefined) {
-      result = result.filter(emp => filters.hasManager ? !!emp.manager : !emp.manager);
-    }
+  const employees = useMemo(() => {
+    let out = rows;
+    if (filters.role) out = out.filter((e) => e.role === filters.role);
+    if (typeof filters.hasManager === 'boolean') out = out.filter((e) => Boolean(e.manager) === filters.hasManager);
+    if (typeof filters.salaryMin === 'number') out = out.filter((e) => (e.salary ?? 0) >= filters.salaryMin);
+    if (typeof filters.salaryMax === 'number') out = out.filter((e) => (e.salary ?? 0) <= filters.salaryMax);
+    const isValidDate = (d?: Date) => d instanceof Date && !Number.isNaN(d.getTime());
+    if (isValidDate(filters.birthDateFrom)) out = out.filter((e) => e.birthDate && e.birthDate >= filters.birthDateFrom!);
+    if (isValidDate(filters.birthDateTo)) out = out.filter((e) => e.birthDate && e.birthDate <= filters.birthDateTo!);
+    return out;
+  }, [rows, filters]);
 
-    if (filters.salaryMin !== undefined) {
-      result = result.filter(emp => emp.salary >= filters.salaryMin!);
-    }
+  const allEmployees = rows;
 
-    if (filters.salaryMax !== undefined) {
-      result = result.filter(emp => emp.salary <= filters.salaryMax!);
-    }
-
-    if (filters.birthDateFrom) {
-      result = result.filter(emp => emp.birthDate >= filters.birthDateFrom!);
-    }
-
-    if (filters.birthDateTo) {
-      result = result.filter(emp => emp.birthDate <= filters.birthDateTo!);
-    }
-
-    // Apply sorting
-    result.sort((a, b) => {
-      const aValue = a[sort.field];
-      const bValue = b[sort.field];
-      
-      if (aValue < bValue) return sort.direction === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sort.direction === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    return result;
-  }, [employees, filters, sort]);
-
-  const paginatedEmployees = useMemo(() => {
-    const startIndex = (pagination.page - 1) * pagination.limit;
-    const endIndex = startIndex + pagination.limit;
-    
-    setPagination(prev => ({ 
-      ...prev, 
-      total: filteredAndSortedEmployees.length 
-    }));
-    
-    return filteredAndSortedEmployees.slice(startIndex, endIndex);
-  }, [filteredAndSortedEmployees, pagination.page, pagination.limit]);
-
-  const createEmployee = (employeeData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const newEmployee: Employee = {
-      ...employeeData,
-      id: Math.random().toString(36).substr(2, 9),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    setEmployees(prev => [...prev, newEmployee]);
-    return newEmployee;
-  };
-
-  const updateEmployee = (id: string, updates: Partial<Employee>) => {
-    setEmployees(prev => 
-      prev.map(emp => 
-        emp.id === id 
-          ? { ...emp, ...updates, updatedAt: new Date() }
-          : emp
-      )
-    );
-  };
-
-  const deleteEmployee = (id: string) => {
-    // Check if employee is a manager
-    const hasReports = employees.some(emp => emp.manager === id);
-    if (hasReports) {
-      throw new Error('Cannot delete employee who is managing other employees');
-    }
-    setEmployees(prev => prev.filter(emp => emp.id !== id));
-  };
-
-  const getEmployee = (id: string) => {
-    return employees.find(emp => emp.id === id);
-  };
+  const mCreate = useMutation({
+    mutationFn: (body: EmployeeCreateInput) => createEmployee(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['employees'] }),
+  });
+  const mUpdate = useMutation({
+    mutationFn: ({ id, ...rest }: EmployeeUpdateInput) => updateEmployee(id, rest),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['employees'] }),
+  });
+  const mDelete = useMutation({
+    mutationFn: (id: string) => deleteEmployee(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['employees'] }),
+  });
 
   return {
-    employees: paginatedEmployees,
-    allEmployees: employees,
-    filteredEmployees: filteredAndSortedEmployees,
+    isLoading: query.isLoading,
+    error: query.error,
+    employees,
+    allEmployees,
+    pagination: { page, limit, total: query.data?.total ?? rows.length },
+    setPage,
     filters,
-    sort,
-    pagination,
     setFilters,
-    setSort,
-    setPagination,
-    createEmployee,
-    updateEmployee,
-    deleteEmployee,
-    getEmployee,
+    refetch: query.refetch,
+    createEmployee: mCreate.mutateAsync,
+    updateEmployee: mUpdate.mutateAsync,
+    deleteEmployee: mDelete.mutateAsync,
+    isCreating: mCreate.isPending,
+    isUpdating: mUpdate.isPending,
+    isDeleting: mDelete.isPending,
   };
 }

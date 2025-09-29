@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { toSelectValue } from '@/lib/select';
 import {
   Popover,
   PopoverContent,
@@ -55,12 +56,12 @@ export default function EmployeeFiltersComponent({ filters, onFiltersChange }: E
       </div>
 
       {/* Quick Role Filter */}
-      <Select value={filters.role || ''} onValueChange={(value) => updateFilter('role', value || undefined)}>
+      <Select value={toSelectValue(filters.role)} onValueChange={(value) => updateFilter('role', value === 'all' ? undefined : value)}>
         <SelectTrigger className="w-48">
-          <SelectValue placeholder="Filter by role" />
+          <SelectValue placeholder="Any role" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">All Roles</SelectItem>
+          <SelectItem value="all">All roles</SelectItem>
           {EMPLOYEE_ROLES.map((role) => (
             <SelectItem key={role} value={role}>
               {role}
