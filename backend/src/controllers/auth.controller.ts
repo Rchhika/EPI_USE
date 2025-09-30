@@ -1,3 +1,4 @@
+// auth.controller.ts
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { ADMIN_EMAIL, ADMIN_PASSWORD, JWT_SECRET, SESSION_MAX_AGE_DAYS } from '../config/env';
@@ -13,8 +14,8 @@ function signToken() {
 function authCookieOptions(maxAgeMs: number) {
   return {
     httpOnly: true,
-    sameSite: 'lax' as const,
-    secure: isProd,
+    secure: isProd,                         // HTTPS in prod
+    sameSite: (isProd ? 'none' : 'lax') as 'none' | 'lax', // <-- key fix
     maxAge: maxAgeMs,
     path: '/',
   };
@@ -24,6 +25,7 @@ export async function login(req: Request, res: Response) {
   const { email, password } = req.body as { email?: string; password?: string };
   if (!email || !password) return res.status(400).json({ message: 'Email and password are required' });
   if (email !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) return res.status(401).json({ message: 'Invalid credentials' });
+
   const { token, maxAgeMs } = signToken();
   res.cookie('auth_token', token, authCookieOptions(maxAgeMs));
   return res.status(200).json({ email: ADMIN_EMAIL });
@@ -41,8 +43,12 @@ export async function me(req: Request, res: Response) {
 }
 
 export async function logout(_req: Request, res: Response) {
-  res.clearCookie('auth_token', { httpOnly: true, sameSite: 'lax', secure: isProd, path: '/' });
+  // Match the same cookie flags when clearing
+  res.clearCookie('auth_token', {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: (isProd ? 'none' : 'lax') as 'none' | 'lax',
+    path: '/',
+  });
   return res.status(204).send();
 }
-
-
