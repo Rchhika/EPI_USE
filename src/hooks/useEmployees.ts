@@ -3,7 +3,7 @@ import {
   useQuery,
   useMutation,
   useQueryClient,
-  keepPreviousData, // v5 helper for placeholderData
+  keepPreviousData, // v5 helper
 } from '@tanstack/react-query';
 import {
   listEmployees,
@@ -11,7 +11,11 @@ import {
   updateEmployee,
   deleteEmployee,
 } from '@/features/auth/employees/api';
-import type { Employee, EmployeeCreateInput, EmployeeUpdateInput } from '@/types/employee';
+import type {
+  Employee,
+  EmployeeCreateInput,
+  EmployeeUpdateInput,
+} from '@/types/employee';
 
 type Filters = {
   search?: string;
@@ -39,23 +43,28 @@ export function useEmployees() {
 
   const [filters, setFilters] = useState<Filters>({});
   const [page, setPage] = useState(1);
-  const [limit] = useState(20);
+
+  // Pull more rows so dashboard metrics (avg salary, etc.) are meaningful.
+  // If you expect thousands of records, consider a dedicated /summary endpoint instead.
+  const [limit] = useState(500);
+
+  const trimmedQ = (filters.search ?? '').trim();
 
   const query = useQuery<EmployeesResponse>({
-    queryKey: ['employees', { page, limit, q: (filters.search ?? '').trim() }],
+    queryKey: ['employees', { page, limit, q: trimmedQ }],
     queryFn: () =>
       listEmployees({
         page,
         limit,
-        q: (filters.search ?? '').trim() || undefined,
+        q: trimmedQ || undefined,
         sort: '-createdAt',
       }),
-    // keeps previous page data while fetching the next
     placeholderData: keepPreviousData,
   });
 
   const rows = query.data?.data ?? [];
 
+  // Local filtering (UI filters beyond the server's search)
   const employees = useMemo(() => {
     let out = rows;
 
@@ -66,11 +75,11 @@ export function useEmployees() {
     }
 
     if (typeof filters.salaryMin === 'number') {
-      out = out.filter((e) => (e.salary ?? 0) >= filters.salaryMin!);
+      out = out.filter((e) => (e.salary ?? 0) >= filters.salaryMin);
     }
 
     if (typeof filters.salaryMax === 'number') {
-      out = out.filter((e) => (e.salary ?? 0) <= filters.salaryMax!);
+      out = out.filter((e) => (e.salary ?? 0) <= filters.salaryMax);
     }
 
     if (filters.birthDateFrom) {
@@ -90,8 +99,7 @@ export function useEmployees() {
     return out;
   }, [rows, filters]);
 
-  const allEmployees = rows;
-
+  // Mutations
   const mCreate = useMutation({
     mutationFn: (body: EmployeeCreateInput) => createEmployee(body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['employees'] }),
@@ -107,21 +115,35 @@ export function useEmployees() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['employees'] }),
   });
 
+  // Use server total (better for KPIs than employees.length)
+  const total = query.data?.total ?? rows.length;
+
   return {
+    // query state
     isLoading: query.isLoading,
+    isFetching: query.isFetching,
     error: query.error as unknown,
+
+    // data
     employees,
-    allEmployees,
-    pagination: { page, limit, total: query.data?.total ?? rows.length },
+    allEmployees: rows,
+    total, // <— expose this for the Dashboard KPI
+
+    // pagination
+    pagination: { page, limit, total },
     setPage,
+
+    // filters
     filters,
     setFilters,
+
+    // controls
     refetch: query.refetch,
 
+    // mutations
     createEmployee: mCreate.mutateAsync,
     updateEmployee: mUpdate.mutateAsync,
     deleteEmployee: mDelete.mutateAsync,
-
     isCreating: mCreate.isPending,
     isUpdating: mUpdate.isPending,
     isDeleting: mDelete.isPending,

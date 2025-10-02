@@ -7,9 +7,9 @@ import type { Employee } from '@/types/employee';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { employees, isLoading, error } = useEmployees();
+  const { employees, total, isLoading, error } = useEmployees();
 
-  // ---------- Helpers ----------
+  // ---------- helpers ----------
   const toDate = (d?: Date | string) =>
     d instanceof Date ? d : d ? new Date(d) : undefined;
 
@@ -20,7 +20,7 @@ export default function Dashboard() {
     return d >= cutoff;
   };
 
-  // ---------- Derived metrics ----------
+  // ---------- derived metrics ----------
   const {
     totalEmployees,
     new30,
@@ -28,13 +28,13 @@ export default function Dashboard() {
     deltaNew30,
     avgSalary,
     totalPayroll,
-    activeRatio,
     managersCount,
     recentHires,
   } = useMemo(() => {
-    const totalEmployees = employees.length;
+    // Use server total so KPIs reflect the whole DB
+    const totalEmployees = total ?? employees.length;
 
-    // New hires in last 30 days vs previous 30 days
+    // windows for last 30d and the previous 30d
     const now = new Date();
     const start30 = new Date(now); start30.setDate(start30.getDate() - 30);
     const start60 = new Date(now); start60.setDate(start60.getDate() - 60);
@@ -44,7 +44,6 @@ export default function Dashboard() {
 
     const salaries: number[] = [];
     const managerRefs = new Set<string>();
-    let active = 0;
 
     for (const e of employees) {
       const created = toDate(e.createdAt);
@@ -53,31 +52,24 @@ export default function Dashboard() {
         else if (created >= start60) newPrev30 += 1;
       }
       if (typeof e.salary === 'number') salaries.push(e.salary);
-      if (e.isActive !== false) active += 1; // default to active when missing
-      if (e.id && e.id.length) {
-        // if anyone points to someone as a manager, we count that person as a manager
-        // (we'll compute from an outside loop just below)
-      }
-    }
-
-    // Build set of "people that appear as manager"
-    for (const e of employees) {
       if (e.manager) managerRefs.add(String(e.manager));
     }
+
     const managersCount = managerRefs.size;
 
     const avgSalary =
-      salaries.length ? Math.round(salaries.reduce((a, b) => a + b, 0) / salaries.length) : 0;
-    const totalPayroll = salaries.reduce((a, b) => a + b, 0); // assume annual; display as $ total
+      salaries.length
+        ? Math.round(salaries.reduce((a, b) => a + b, 0) / salaries.length)
+        : 0;
 
-    const activeRatio = totalEmployees ? Math.round((active / totalEmployees) * 100) : 0;
+    const totalPayroll = salaries.reduce((a, b) => a + b, 0);
 
-    // Recent hires (90 days) for the card
     const recentHires = employees
       .filter((e) => inLastDays(toDate(e.createdAt), 90))
       .sort(
         (a, b) =>
-          (toDate(b.createdAt)?.getTime() ?? 0) - (toDate(a.createdAt)?.getTime() ?? 0)
+          (toDate(b.createdAt)?.getTime() ?? 0) -
+          (toDate(a.createdAt)?.getTime() ?? 0)
       )
       .slice(0, 8);
 
@@ -88,15 +80,14 @@ export default function Dashboard() {
       deltaNew30: new30 - newPrev30,
       avgSalary,
       totalPayroll,
-      activeRatio,
       managersCount,
       recentHires,
     };
-  }, [employees]);
+  }, [employees, total]);
 
   return (
     <div className="space-y-8">
-      {/* Page Header */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-playfair font-bold text-foreground">EPI_USE_EMS</h1>
@@ -106,7 +97,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* KPI Row: 6-up across 12 columns for a full look */}
+      {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-5">
         <KpiCard
           className="xl:col-span-2"
@@ -119,7 +110,7 @@ export default function Dashboard() {
           className="xl:col-span-2"
           title="New Hires (30d)"
           value={isLoading ? '—' : String(new30)}
-          sub={isLoading ? '' : deltaBadge(deltaNew30, 'vs prev 30d')}
+          sub={isLoading ? undefined : deltaBadge(deltaNew30, 'vs prev 30d')}
           icon="✨"
         />
         <KpiCard
@@ -138,18 +129,13 @@ export default function Dashboard() {
         />
         <KpiCard
           className="xl:col-span-2"
-          title="Active Ratio"
-          value={isLoading ? '—' : `${activeRatio}%`}
-          sub="Active employees"
-          icon="✅"
-        />
-        <KpiCard
-          className="xl:col-span-2"
           title="Managers"
           value={isLoading ? '—' : String(managersCount)}
           sub="People managing others"
           icon="🧭"
         />
+        {/* Leave the last slot for a future KPI or keep the grid tight */}
+        <div className="xl:col-span-2 hidden xl:block" />
       </div>
 
       {/* Middle Row */}
@@ -160,9 +146,7 @@ export default function Dashboard() {
             <CardTitle className="flex items-center gap-2">
               <span>Recent Hires</span>
             </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              New employees in the last 90 days
-            </p>
+            <p className="text-sm text-muted-foreground">New employees in the last 90 days</p>
           </CardHeader>
           <CardContent>
             {error ? (
@@ -199,30 +183,36 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Space filler / future insight card */}
+        {/* At a Glance */}
         <Card className="hover-lift">
           <CardHeader className="pb-3">
             <CardTitle>At a Glance</CardTitle>
             <p className="text-sm text-muted-foreground">Quick insights</p>
           </CardHeader>
           <CardContent className="space-y-3">
-            <InsightRow label="Employees with salary set" value={String(
-              employees.filter(e => typeof e.salary === 'number').length
-            )} />
-            <InsightRow label="Employees without manager" value={String(
-              employees.filter(e => !e.manager).length
-            )} />
-            <InsightRow label="Roles in use" value={String(
-              new Set(employees.map(e => e.role).filter(Boolean)).size
-            )} />
-            <InsightRow label="Newest employee" value={
-              (() => {
+            <InsightRow
+              label="Employees with salary set"
+              value={String(employees.filter((e) => typeof e.salary === 'number').length)}
+            />
+            <InsightRow
+              label="Employees without manager"
+              value={String(employees.filter((e) => !e.manager).length)}
+            />
+            <InsightRow
+              label="Roles in use"
+              value={String(new Set(employees.map((e) => e.role).filter(Boolean)).size)}
+            />
+            <InsightRow
+              label="Newest employee"
+              value={(() => {
                 const newest = [...employees].sort(
-                  (a,b) => (toDate(b.createdAt)?.getTime() ?? 0) - (toDate(a.createdAt)?.getTime() ?? 0)
+                  (a, b) =>
+                    (toDate(b.createdAt)?.getTime() ?? 0) -
+                    (toDate(a.createdAt)?.getTime() ?? 0)
                 )[0];
                 return newest ? `${newest.name} ${newest.surname}` : '—';
-              })()
-            } />
+              })()}
+            />
           </CardContent>
         </Card>
       </div>
@@ -236,7 +226,6 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             <ActionButton label="View All Employees" onClick={() => navigate('/employees')} />
             <ActionButton label="Organization Chart" onClick={() => navigate('/org-chart')} />
-            {/* Add one more action if you like */}
             <ActionButton label="Export CSV" onClick={() => navigate('/employees')} />
           </div>
         </CardContent>
@@ -245,7 +234,7 @@ export default function Dashboard() {
   );
 }
 
-/* ---------------- helpers & small components ---------------- */
+/* ---------- small components & utils ---------- */
 
 function KpiCard({
   title,
@@ -315,5 +304,9 @@ function formatMoney(n: number) {
 
 function formatDate(d: Date | string) {
   const date = d instanceof Date ? d : new Date(d);
-  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
 }
