@@ -5,9 +5,9 @@ export interface EmployeeDocument extends Document {
   surname: string;
   email: string;
   birthDate?: Date;
-  employeeNumber?: string;
+  employeeNumber: string; // canonical, stored UPPERCASE
   salary?: number;
-  role?: 'Employee' | 'Manager' | 'Admin' | string;
+  role: string;
   manager?: mongoose.Types.ObjectId | null;
   isActive: boolean;
   createdAt: Date;
@@ -18,16 +18,29 @@ const EmployeeSchema = new Schema<EmployeeDocument>(
   {
     firstName: { type: String, required: true, trim: true },
     surname:   { type: String, required: true, trim: true },
-    email:     { type: String, required: true, unique: true, lowercase: true, trim: true },
+    email:     { type: String, required: true, trim: true, lowercase: true, unique: true, index: true },
     birthDate: { type: Date },
-    employeeNumber: { type: String },
-    salary:    { type: Number, default: 0 },
-    role:      { type: String, default: 'Employee' },
-    manager:   { type: Schema.Types.ObjectId, ref: 'Employee', default: null },
-    isActive:  { type: Boolean, default: true },
+
+    // Normalize and enforce uniqueness here
+    employeeNumber: {
+      type: String,
+      required: true,
+      trim: true,
+      uppercase: true,         // "emp1" and "EMP1" become identical
+      unique: true,
+      index: true,
+    },
+
+    salary:   { type: Number },
+    role:     { type: String, required: true, trim: true },
+    manager:  { type: Schema.Types.ObjectId, ref: 'Employee', default: null },
+    isActive: { type: Boolean, default: true },
   },
-  { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
+  { timestamps: true }
 );
+
+// Explicit index (good for existing clusters / re-syncs)
+EmployeeSchema.index({ employeeNumber: 1 }, { unique: true });
 
 export const Employee: Model<EmployeeDocument> =
   mongoose.models.Employee || mongoose.model<EmployeeDocument>('Employee', EmployeeSchema);

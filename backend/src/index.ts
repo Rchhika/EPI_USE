@@ -2,6 +2,7 @@ import app from './app';
 import { PORT } from './config/env';
 import { connectToDatabase } from './db/mongoose';
 
+
 async function bootstrap() {
   try {
     await connectToDatabase();

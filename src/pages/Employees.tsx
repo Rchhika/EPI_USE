@@ -1,11 +1,14 @@
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { UserPlus, Download } from 'lucide-react';
-import EmployeeTable from '@/components/employees/EmployeeTable';
-import EmployeeFilters from '@/components/employees/EmployeeFilters';
-import { useEmployees } from '@/hooks/useEmployees';
-import type { Employee } from '@/types/employee';
+import { useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { UserPlus, Download } from "lucide-react";
+import EmployeeTable from "@/components/employees/EmployeeTable";
+import EmployeeFilters from "@/components/employees/EmployeeFilters";
+import { useEmployees } from "@/hooks/useEmployees";
+import type { Employee } from "@/types/employee";
+import EmployeeFormDialog, { EmployeeFormValues } from "@/components/employees/EmployeeFormDialog";
+
+type Mode = { type: "create" } | { type: "edit"; employee: Employee } | null;
 
 export default function Employees() {
   const {
@@ -21,107 +24,107 @@ export default function Employees() {
     refetch,
     pagination,
     setPage,
-  } = useEmployees();
+    // if your hook exposes these (from earlier), great; if not, it's fine—`submitting` will stay false
+    isCreating,
+    isUpdating,
+  } = useEmployees() as any;
 
-  const [adding, setAdding] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [formMode, setFormMode] = useState<Mode>(null);
+
+  // Managers list for the dialog (id + display name)
+  const managers = useMemo(
+    () => allEmployees.map((e: Employee) => ({ id: e.id, name: e.name, surname: e.surname })),
+    [allEmployees]
+  );
 
   // ----- Actions -----
-  const handleEdit = async (employee: Employee) => {
-    // TODO: open your edit modal here and pass the form values to updateEmployee
-    try {
-      await updateEmployee({ id: employee.id, role: employee.role });
-      // Optionally refetch if your table isn't optimistic
-      await refetch();
-    } catch (e: any) {
-      console.error(e);
-      alert(e?.message ?? 'Failed to update employee');
+  const handleCreate = async (vals: EmployeeFormValues) => {
+    const body = {
+      ...vals,
+      birthDate: vals.birthDate ? new Date(vals.birthDate) : undefined,
+      salary: vals.salary ? Number(vals.salary) : undefined,
+      manager: vals.manager === "__none__" ? undefined : vals.manager,
+    };
+    // simple client-side guard for employeeNumber
+    if (!body.employeeNumber?.trim()) {
+      alert("Employee number is required");
+      return;
     }
+    await createEmployee(body);  // will throw if backend returns error -> dialog catches it
+    await refetch();
+  };
+  const handleUpdate = async (employee: Employee, vals: EmployeeFormValues) => {
+    const body = {
+      ...vals,
+      birthDate: vals.birthDate ? new Date(vals.birthDate) : undefined,
+      salary: vals.salary ? Number(vals.salary) : undefined,
+      manager: vals.manager === "__none__" ? undefined : vals.manager,
+    };
+    if (!body.employeeNumber?.trim()) {
+      alert("Employee number is required");
+      return;
+    }
+    await updateEmployee({ id: employee.id, ...body }); // will throw on 409 duplicate, etc.
+    await refetch();
+  };
+
+  const handleEdit = (employee: Employee) => {
+    setFormMode({ type: "edit", employee });
   };
 
   const handleDelete = async (employee: Employee) => {
     if (!confirm(`Delete ${employee.name} ${employee.surname}?`)) return;
-    try {
-      await deleteEmployee(employee.id);
-      await refetch();
-    } catch (e: any) {
-      console.error(e);
-      alert(e?.message ?? 'Failed to delete employee');
-    }
+    await deleteEmployee(employee.id);
+    await refetch();
   };
 
   const handleView = (employee: Employee) => {
-    // TODO: open a side panel / modal if desired
-    console.log('View employee:', employee);
-  };
-
-  const handleQuickAdd = async () => {
-    // Replace with your "Create Employee" dialog + form; this is a smoke test
-    try {
-      setAdding(true);
-      await createEmployee({
-        name: 'Rohan',
-        surname: 'Chhika',
-        email: `rohan+${Date.now()}@example.com`,
-        birthDate: new Date('1999-01-01'),
-        employeeNumber: 'EMP' + Math.floor(Math.random() * 10000),
-        salary: 100000,
-        role: 'CEO',
-      });
-      await refetch();
-    } catch (e: any) {
-      console.error(e);
-      alert(e?.message ?? 'Failed to add employee');
-    } finally {
-      setAdding(false);
-    }
+    // Optional: open a side panel or details modal
+    console.log("View employee:", employee);
   };
 
   const exportCSV = () => {
     try {
       setExporting(true);
-      const rows = employees;
-      if (!rows?.length) {
-        alert('No employees to export.');
+      const rows: Employee[] = employees ?? [];
+      if (!rows.length) {
+        alert("No employees to export.");
         return;
       }
       const header = [
-        'id',
-        'name',
-        'surname',
-        'email',
-        'birthDate',
-        'employeeNumber',
-        'salary',
-        'role',
-        'manager',
-        'createdAt',
-        'updatedAt',
+        "id",
+        "name",
+        "surname",
+        "email",
+        "birthDate",
+        "employeeNumber",
+        "salary",
+        "role",
+        "manager",
       ];
       const csv = [
-        header.join(','),
+        header.join(","),
         ...rows.map((e) =>
           [
             e.id,
             csvQuote(e.name),
             csvQuote(e.surname),
             e.email,
-            e.birthDate ? e.birthDate.toISOString() : '',
-            e.employeeNumber ?? '',
+            e.birthDate ? new Date(e.birthDate as any).toISOString() : "",
+            e.employeeNumber ?? "",
             e.salary ?? 0,
-            csvQuote(e.role ?? ''),
-            e.manager ?? '',
-            e.createdAt ? e.createdAt.toISOString() : '',
-            e.updatedAt ? e.updatedAt.toISOString() : '',
-          ].join(',')
+            csvQuote(e.role ?? ""),
+            e.manager ?? "",
+          ].join(",")
         ),
-      ].join('\n');
+      ].join("\n");
 
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = 'employees.csv';
+      a.download = "employees.csv";
       a.click();
       URL.revokeObjectURL(url);
     } finally {
@@ -130,18 +133,14 @@ export default function Employees() {
   };
 
   // ----- UI helpers -----
-  const csvQuote = (s?: string) => `"${(s ?? '').replace(/"/g, '""')}"`;
+  const csvQuote = (s?: string) => `"${(s ?? "").replace(/"/g, '""')}"`;
+  const submitting = Boolean(isCreating) || Boolean(isUpdating);
 
   // ----- Rendering -----
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <Header
-          onExport={exportCSV}
-          onAdd={handleQuickAdd}
-          exporting={exporting}
-          adding={adding}
-        />
+        <Header onExport={exportCSV} onAdd={() => setFormMode({ type: "create" })} exporting={exporting} total={pagination?.total} />
         <Card className="hover-lift">
           <CardHeader>
             <CardTitle>Filters</CardTitle>
@@ -158,12 +157,7 @@ export default function Employees() {
   if (error) {
     return (
       <div className="space-y-6">
-        <Header
-          onExport={exportCSV}
-          onAdd={handleQuickAdd}
-          exporting={exporting}
-          adding={adding}
-        />
+        <Header onExport={exportCSV} onAdd={() => setFormMode({ type: "create" })} exporting={exporting} total={pagination?.total} />
         <Card className="hover-lift">
           <CardHeader>
             <CardTitle>Filters</CardTitle>
@@ -173,7 +167,10 @@ export default function Employees() {
           </CardContent>
         </Card>
         <div className="text-red-600">
-          Failed to load employees. <button className="underline" onClick={() => refetch()}>Retry</button>
+          Failed to load employees.{" "}
+          <button className="underline" onClick={() => refetch()}>
+            Retry
+          </button>
         </div>
       </div>
     );
@@ -185,9 +182,8 @@ export default function Employees() {
     <div className="space-y-6">
       <Header
         onExport={exportCSV}
-        onAdd={handleQuickAdd}
+        onAdd={() => setFormMode({ type: "create" })}
         exporting={exporting}
-        adding={adding}
         total={pagination?.total}
       />
 
@@ -201,7 +197,7 @@ export default function Employees() {
       </Card>
 
       {!hasData ? (
-        <EmptyState onAdd={handleQuickAdd} adding={adding} />
+        <EmptyState onAdd={() => setFormMode({ type: "create" })} />
       ) : (
         <EmployeeTable
           data={employees}
@@ -213,6 +209,44 @@ export default function Employees() {
           // page={pagination.page} onPageChange={setPage} pageSize={pagination.limit}
         />
       )}
+
+      {/* Create */}
+      <EmployeeFormDialog
+        open={formMode?.type === "create"}
+        onOpenChange={(v) => !v && setFormMode(null)}
+        title="Add employee"
+        managers={managers}
+        submitting={submitting}
+        onSubmit={handleCreate}
+      />
+
+      {/* Edit */}
+      <EmployeeFormDialog
+        open={formMode?.type === "edit"}
+        onOpenChange={(v) => !v && setFormMode(null)}
+        title="Edit employee"
+        managers={managers}
+        submitting={submitting}
+        defaultValues={
+          formMode?.type === "edit"
+            ? {
+                name: formMode.employee.name,
+                surname: formMode.employee.surname,
+                email: formMode.employee.email,
+                birthDate: formMode.employee.birthDate
+                  ? new Date(formMode.employee.birthDate as any).toISOString().slice(0, 10)
+                  : "",
+                employeeNumber: formMode.employee.employeeNumber,
+                salary: formMode.employee.salary != null ? String(formMode.employee.salary) : "",
+                role: formMode.employee.role,
+                manager: formMode.employee.manager || "",
+              }
+            : undefined
+        }
+        onSubmit={(vals) =>
+          formMode?.type === "edit" ? handleUpdate(formMode.employee, vals) : Promise.resolve()
+        }
+      />
     </div>
   );
 }
@@ -223,13 +257,11 @@ function Header({
   onExport,
   onAdd,
   exporting,
-  adding,
   total,
 }: {
   onExport: () => void;
   onAdd: () => void;
   exporting: boolean;
-  adding: boolean;
   total?: number;
 }) {
   return (
@@ -237,33 +269,33 @@ function Header({
       <div>
         <h1 className="text-3xl font-playfair font-bold text-foreground">Employees</h1>
         <p className="text-muted-foreground mt-1">
-          Manage your team members{typeof total === 'number' ? ` • ${total} total` : ''}
+          Manage your team members{typeof total === "number" ? ` • ${total} total` : ""}
         </p>
       </div>
       <div className="flex gap-2">
         <Button variant="outline" onClick={onExport} disabled={exporting}>
           <Download className="mr-2 h-4 w-4" />
-          {exporting ? 'Exporting…' : 'Export CSV'}
+          {exporting ? "Exporting…" : "Export CSV"}
         </Button>
-        <Button className="bg-gradient-primary hover:opacity-90" onClick={onAdd} disabled={adding}>
+        <Button className="bg-gradient-primary hover:opacity-90" onClick={onAdd}>
           <UserPlus className="mr-2 h-4 w-4" />
-          {adding ? 'Adding…' : 'Add Employee'}
+          Add Employee
         </Button>
       </div>
     </div>
   );
 }
 
-function EmptyState({ onAdd, adding }: { onAdd: () => void; adding: boolean }) {
+function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
     <Card className="hover-lift">
       <CardContent className="py-12 text-center">
         <div className="text-lg font-medium">No employees found</div>
         <p className="text-muted-foreground mt-1">Start by adding your first employee.</p>
         <div className="mt-4">
-          <Button className="bg-gradient-primary hover:opacity-90" onClick={onAdd} disabled={adding}>
+          <Button className="bg-gradient-primary hover:opacity-90" onClick={onAdd}>
             <UserPlus className="mr-2 h-4 w-4" />
-            {adding ? 'Adding…' : 'Add Employee'}
+            Add Employee
           </Button>
         </div>
       </CardContent>

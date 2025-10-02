@@ -3,7 +3,7 @@ import {
   useQuery,
   useMutation,
   useQueryClient,
-  keepPreviousData, // <-- v5 helper
+  keepPreviousData, // v5 helper for placeholderData
 } from '@tanstack/react-query';
 import {
   listEmployees,
@@ -13,12 +13,26 @@ import {
 } from '@/features/auth/employees/api';
 import type { Employee, EmployeeCreateInput, EmployeeUpdateInput } from '@/types/employee';
 
+type Filters = {
+  search?: string;
+  role?: string;
+  hasManager?: boolean;
+  salaryMin?: number;
+  salaryMax?: number;
+  birthDateFrom?: Date;
+  birthDateTo?: Date;
+};
+
 type EmployeesResponse = {
   data: Employee[];
-  total: number;  
+  total: number;
   page: number;
   limit: number;
 };
+
+// Coerce unknown to Date when needed
+const toDate = (d: unknown) =>
+  d instanceof Date ? d : d ? new Date(String(d)) : undefined;
 
 export function useEmployees() {
   const qc = useQueryClient();
@@ -36,7 +50,7 @@ export function useEmployees() {
         q: (filters.search ?? '').trim() || undefined,
         sort: '-createdAt',
       }),
-    // v5 replacement for keepPreviousData: true
+    // keeps previous page data while fetching the next
     placeholderData: keepPreviousData,
   });
 
@@ -44,13 +58,35 @@ export function useEmployees() {
 
   const employees = useMemo(() => {
     let out = rows;
+
     if (filters.role) out = out.filter((e) => e.role === filters.role);
-    if (typeof filters.hasManager === 'boolean') out = out.filter((e) => Boolean(e.manager) === filters.hasManager);
-    if (typeof filters.salaryMin === 'number') out = out.filter((e) => (e.salary ?? 0) >= filters.salaryMin);
-    if (typeof filters.salaryMax === 'number') out = out.filter((e) => (e.salary ?? 0) <= filters.salaryMax);
-    const isValidDate = (d?: Date) => d instanceof Date && !Number.isNaN(d.getTime());
-    if (isValidDate(filters.birthDateFrom)) out = out.filter((e) => e.birthDate && e.birthDate >= filters.birthDateFrom!);
-    if (isValidDate(filters.birthDateTo)) out = out.filter((e) => e.birthDate && e.birthDate <= filters.birthDateTo!);
+
+    if (typeof filters.hasManager === 'boolean') {
+      out = out.filter((e) => Boolean(e.manager) === filters.hasManager);
+    }
+
+    if (typeof filters.salaryMin === 'number') {
+      out = out.filter((e) => (e.salary ?? 0) >= filters.salaryMin!);
+    }
+
+    if (typeof filters.salaryMax === 'number') {
+      out = out.filter((e) => (e.salary ?? 0) <= filters.salaryMax!);
+    }
+
+    if (filters.birthDateFrom) {
+      out = out.filter((e) => {
+        const bd = toDate(e.birthDate);
+        return bd && bd >= filters.birthDateFrom!;
+      });
+    }
+
+    if (filters.birthDateTo) {
+      out = out.filter((e) => {
+        const bd = toDate(e.birthDate);
+        return bd && bd <= filters.birthDateTo!;
+      });
+    }
+
     return out;
   }, [rows, filters]);
 
@@ -60,10 +96,12 @@ export function useEmployees() {
     mutationFn: (body: EmployeeCreateInput) => createEmployee(body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['employees'] }),
   });
+
   const mUpdate = useMutation({
     mutationFn: ({ id, ...rest }: EmployeeUpdateInput) => updateEmployee(id, rest),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['employees'] }),
   });
+
   const mDelete = useMutation({
     mutationFn: (id: string) => deleteEmployee(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['employees'] }),
@@ -71,7 +109,7 @@ export function useEmployees() {
 
   return {
     isLoading: query.isLoading,
-    error: query.error,
+    error: query.error as unknown,
     employees,
     allEmployees,
     pagination: { page, limit, total: query.data?.total ?? rows.length },
@@ -79,9 +117,11 @@ export function useEmployees() {
     filters,
     setFilters,
     refetch: query.refetch,
+
     createEmployee: mCreate.mutateAsync,
     updateEmployee: mUpdate.mutateAsync,
     deleteEmployee: mDelete.mutateAsync,
+
     isCreating: mCreate.isPending,
     isUpdating: mUpdate.isPending,
     isDeleting: mDelete.isPending,
