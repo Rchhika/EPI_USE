@@ -27,7 +27,7 @@ export default function Header() {
               <Building className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-playfair font-bold text-foreground">EmpireHR</h1>
+              <h1 className="text-xl font-playfair font-bold text-foreground">EPI_USE_EMS</h1>
               <p className="text-xs text-muted-foreground">Employee Management</p>
             </div>
           </div>

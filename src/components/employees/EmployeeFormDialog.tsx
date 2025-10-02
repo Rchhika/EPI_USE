@@ -148,8 +148,8 @@ export default function EmployeeFormDialog({
               value={values.manager || undefined}
               onValueChange={(v) => form.setValue("manager", v)}
             >
-              <SelectTrigger><SelectValue placeholder="No manager" /></SelectTrigger>
-              <SelectContent>
+              <SelectTrigger className="select-trigger"><SelectValue placeholder="Select a manager" /></SelectTrigger>
+              <SelectContent className="select-content scrollbar-thin">
                 <SelectItem value="__none__">No manager</SelectItem>
                 {managers.map(m => (
                   <SelectItem key={m.id} value={m.id}>

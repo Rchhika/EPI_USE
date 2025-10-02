@@ -133,7 +133,12 @@ export async function updateEmployee(req: Request, res: Response, next: NextFunc
       const dupe = await Employee.findOne({ employeeNumber: update.employeeNumber, _id: { $ne: id } }).lean();
       if (dupe) return res.status(409).json({ message: 'Employee number already exists' });
     }
+    // controllers/employee.controller.ts (inside update handler, before updating)
+    if (update.manager && String(update.manager) === String(req.params.id)) {
+      return res.status(400).json({ message: 'Employee cannot be their own manager.' });
+    }
 
+  
     const doc = await Employee.findByIdAndUpdate(id, update, {
       new: true,
       runValidators: true,

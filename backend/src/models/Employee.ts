@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document, Model } from 'mongoose';
+import mongoose, { Schema, Document, Model, Types } from 'mongoose';
 
 export interface EmployeeDocument extends Document {
   firstName: string;
@@ -8,7 +8,7 @@ export interface EmployeeDocument extends Document {
   employeeNumber: string; // canonical, stored UPPERCASE
   salary?: number;
   role: string;
-  manager?: mongoose.Types.ObjectId | null;
+  manager?: Types.ObjectId | null;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -26,21 +26,54 @@ const EmployeeSchema = new Schema<EmployeeDocument>(
       type: String,
       required: true,
       trim: true,
-      uppercase: true,         // "emp1" and "EMP1" become identical
+      uppercase: true,           // "emp1" and "EMP1" become identical
       unique: true,
       index: true,
     },
 
     salary:   { type: Number },
     role:     { type: String, required: true, trim: true },
-    manager:  { type: Schema.Types.ObjectId, ref: 'Employee', default: null },
+
+    // Prevent self as manager on create/save
+    manager: {
+      type: Schema.Types.ObjectId,
+      ref: 'Employee',
+      default: null,
+      validate: {
+        validator: function (this: EmployeeDocument, v: Types.ObjectId | null) {
+          if (!v) return true; // no manager is allowed
+          // _id exists during validation; disallow self
+          return this._id?.toString() !== v.toString();
+        },
+        message: 'Employee cannot be their own manager.',
+      },
+    },
+
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }
 );
 
-// Explicit index (good for existing clusters / re-syncs)
+// Explicit indexes (nice for existing clusters / re-syncs)
 EmployeeSchema.index({ employeeNumber: 1 }, { unique: true });
+EmployeeSchema.index({ email: 1 }, { unique: true });
+
+// Also block self-as-manager during atomic updates
+EmployeeSchema.pre('findOneAndUpdate', function () {
+  const update: any = this.getUpdate() || {};
+  // Updates may come as {$set: {manager: ...}} or direct {manager: ...}
+  const set = update.$set ?? update;
+  const newManager = set?.manager;
+  if (!newManager) return;
+
+  const q = this.getQuery() as any;
+  const targetId = (q._id ?? q.id)?.toString();
+  if (!targetId) return;
+
+  if (newManager.toString() === targetId) {
+    throw new Error('Employee cannot be their own manager.');
+  }
+});
 
 export const Employee: Model<EmployeeDocument> =
   mongoose.models.Employee || mongoose.model<EmployeeDocument>('Employee', EmployeeSchema);

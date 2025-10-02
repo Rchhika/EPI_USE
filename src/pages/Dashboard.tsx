@@ -1,171 +1,228 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Users, TrendingUp, Building2, UserPlus, Clock, Award } from 'lucide-react';
-import { mockEmployees } from '@/data/mockEmployees';
-import { getGravatarUrl } from '@/utils/gravatar';
-import { format } from 'date-fns';
-import { Link } from 'react-router-dom';
+import { useEmployees } from '@/hooks/useEmployees';
+import type { Employee } from '@/types/employee';
 
 export default function Dashboard() {
-  // Calculate KPIs
-  const totalEmployees = mockEmployees.length;
-  const roleDistribution = mockEmployees.reduce((acc, emp) => {
-    acc[emp.role] = (acc[emp.role] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-  
-  const unassignedEmployees = mockEmployees.filter(emp => !emp.manager).length;
-  const averageSalary = Math.round(mockEmployees.reduce((sum, emp) => sum + emp.salary, 0) / totalEmployees);
-  
-  // Recent hires (last 90 days)
-  const ninetyDaysAgo = new Date();
-  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-  const recentHires = mockEmployees
-    .filter(emp => emp.createdAt > ninetyDaysAgo)
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-    .slice(0, 5);
+  const navigate = useNavigate();
+  const { employees, isLoading, error } = useEmployees();
 
-  // Top roles by count
-  const topRoles = Object.entries(roleDistribution)
-    .sort(([,a], [,b]) => b - a)
-    .slice(0, 4);
+  // ---------- Helpers ----------
+  const toDate = (d?: Date | string) =>
+    d instanceof Date ? d : d ? new Date(d) : undefined;
+
+  const inLastDays = (d: Date | undefined, days: number) => {
+    if (!d) return false;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    return d >= cutoff;
+  };
+
+  // ---------- Derived metrics ----------
+  const {
+    totalEmployees,
+    new30,
+    newPrev30,
+    deltaNew30,
+    avgSalary,
+    totalPayroll,
+    activeRatio,
+    managersCount,
+    recentHires,
+  } = useMemo(() => {
+    const totalEmployees = employees.length;
+
+    // New hires in last 30 days vs previous 30 days
+    const now = new Date();
+    const start30 = new Date(now); start30.setDate(start30.getDate() - 30);
+    const start60 = new Date(now); start60.setDate(start60.getDate() - 60);
+
+    let new30 = 0;
+    let newPrev30 = 0;
+
+    const salaries: number[] = [];
+    const managerRefs = new Set<string>();
+    let active = 0;
+
+    for (const e of employees) {
+      const created = toDate(e.createdAt);
+      if (created) {
+        if (created >= start30) new30 += 1;
+        else if (created >= start60) newPrev30 += 1;
+      }
+      if (typeof e.salary === 'number') salaries.push(e.salary);
+      if (e.isActive !== false) active += 1; // default to active when missing
+      if (e.id && e.id.length) {
+        // if anyone points to someone as a manager, we count that person as a manager
+        // (we'll compute from an outside loop just below)
+      }
+    }
+
+    // Build set of "people that appear as manager"
+    for (const e of employees) {
+      if (e.manager) managerRefs.add(String(e.manager));
+    }
+    const managersCount = managerRefs.size;
+
+    const avgSalary =
+      salaries.length ? Math.round(salaries.reduce((a, b) => a + b, 0) / salaries.length) : 0;
+    const totalPayroll = salaries.reduce((a, b) => a + b, 0); // assume annual; display as $ total
+
+    const activeRatio = totalEmployees ? Math.round((active / totalEmployees) * 100) : 0;
+
+    // Recent hires (90 days) for the card
+    const recentHires = employees
+      .filter((e) => inLastDays(toDate(e.createdAt), 90))
+      .sort(
+        (a, b) =>
+          (toDate(b.createdAt)?.getTime() ?? 0) - (toDate(a.createdAt)?.getTime() ?? 0)
+      )
+      .slice(0, 8);
+
+    return {
+      totalEmployees,
+      new30,
+      newPrev30,
+      deltaNew30: new30 - newPrev30,
+      avgSalary,
+      totalPayroll,
+      activeRatio,
+      managersCount,
+      recentHires,
+    };
+  }, [employees]);
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      {/* Page Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-playfair font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Welcome to EmpireHR management system</p>
+          <h1 className="text-3xl font-playfair font-bold text-foreground">EPI_USE_EMS</h1>
+          <p className="text-muted-foreground mt-1">
+            Welcome to the Employee Management System
+          </p>
         </div>
-        <Button asChild className="bg-gradient-primary hover:opacity-90">
-          <Link to="/employees">
-            <UserPlus className="mr-2 h-4 w-4" />
-            Add Employee
-          </Link>
-        </Button>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="hover-lift">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Employees</CardTitle>
-            <Users className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{totalEmployees}</div>
-            <p className="text-xs text-success">+2 from last month</p>
-          </CardContent>
-        </Card>
-
-        <Card className="hover-lift">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Avg. Salary</CardTitle>
-            <TrendingUp className="h-4 w-4 text-secondary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">${averageSalary.toLocaleString()}</div>
-            <p className="text-xs text-success">+5% from last year</p>
-          </CardContent>
-        </Card>
-
-        <Card className="hover-lift">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Departments</CardTitle>
-            <Building2 className="h-4 w-4 text-accent" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{Object.keys(roleDistribution).length}</div>
-            <p className="text-xs text-muted-foreground">Active roles</p>
-          </CardContent>
-        </Card>
-
-        <Card className="hover-lift">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Unassigned</CardTitle>
-            <Award className="h-4 w-4 text-warning" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{unassignedEmployees}</div>
-            <p className="text-xs text-warning">Need managers</p>
-          </CardContent>
-        </Card>
+      {/* KPI Row: 6-up across 12 columns for a full look */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-5">
+        <KpiCard
+          className="xl:col-span-2"
+          title="Total Employees"
+          value={isLoading ? '—' : String(totalEmployees)}
+          sub={isLoading ? 'Loading…' : `All current records`}
+          icon="👥"
+        />
+        <KpiCard
+          className="xl:col-span-2"
+          title="New Hires (30d)"
+          value={isLoading ? '—' : String(new30)}
+          sub={isLoading ? '' : deltaBadge(deltaNew30, 'vs prev 30d')}
+          icon="✨"
+        />
+        <KpiCard
+          className="xl:col-span-2"
+          title="Avg Salary"
+          value={isLoading ? '—' : `$${formatMoney(avgSalary)}`}
+          sub="Weighted by current employees"
+          icon="💵"
+        />
+        <KpiCard
+          className="xl:col-span-2"
+          title="Total Payroll"
+          value={isLoading ? '—' : `$${formatMoney(totalPayroll)}`}
+          sub="(annual total)"
+          icon="📈"
+        />
+        <KpiCard
+          className="xl:col-span-2"
+          title="Active Ratio"
+          value={isLoading ? '—' : `${activeRatio}%`}
+          sub="Active employees"
+          icon="✅"
+        />
+        <KpiCard
+          className="xl:col-span-2"
+          title="Managers"
+          value={isLoading ? '—' : String(managersCount)}
+          sub="People managing others"
+          icon="🧭"
+        />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* Middle Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Hires */}
         <Card className="hover-lift">
-          <CardHeader>
+          <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-primary" />
-              Recent Hires
+              <span>Recent Hires</span>
             </CardTitle>
-            <CardDescription>New employees in the last 90 days</CardDescription>
+            <p className="text-sm text-muted-foreground">
+              New employees in the last 90 days
+            </p>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {recentHires.map((employee) => (
-                <div key={employee.id} className="flex items-center space-x-4 p-3 rounded-lg bg-gradient-card hover:bg-card-hover transition-colors">
-                  <img
-                    src={getGravatarUrl(employee.email, 40)}
-                    alt={`${employee.name} ${employee.surname}`}
-                    className="h-10 w-10 rounded-full shadow-custom-sm"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground">
-                      {employee.name} {employee.surname}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">{employee.role}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-muted-foreground">
-                      {format(employee.createdAt, 'MMM dd')}
-                    </p>
-                    <Badge variant="secondary" className="text-xs">
-                      {employee.employeeNumber}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
+            {error ? (
+              <p className="text-sm text-red-600">Failed to load data.</p>
+            ) : isLoading ? (
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            ) : recentHires.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No new hires in the last 90 days.</p>
+            ) : (
+              <ul className="divide-y">
+                {recentHires.map((e) => (
+                  <li key={e.id} className="py-3 flex items-center justify-between">
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">
+                        {e.name} {e.surname}
+                        {e.role ? (
+                          <span className="text-muted-foreground font-normal"> — {e.role}</span>
+                        ) : null}
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate">{e.email}</div>
+                    </div>
+                    <div className="text-xs text-muted-foreground ml-3 shrink-0">
+                      {e.createdAt ? formatDate(e.createdAt) : ''}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="pt-4">
+              <Button variant="outline" size="sm" onClick={() => navigate('/employees')}>
+                View all employees
+              </Button>
             </div>
           </CardContent>
         </Card>
 
-        {/* Role Distribution */}
+        {/* Space filler / future insight card */}
         <Card className="hover-lift">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-secondary" />
-              Top Roles
-            </CardTitle>
-            <CardDescription>Most common positions in the company</CardDescription>
+          <CardHeader className="pb-3">
+            <CardTitle>At a Glance</CardTitle>
+            <p className="text-sm text-muted-foreground">Quick insights</p>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {topRoles.map(([role, count], index) => (
-                <div key={role} className="flex items-center justify-between p-3 rounded-lg bg-gradient-card hover:bg-card-hover transition-colors">
-                  <div className="flex items-center space-x-3">
-                    <div className={`h-3 w-3 rounded-full ${
-                      index === 0 ? 'bg-primary' :
-                      index === 1 ? 'bg-secondary' :
-                      index === 2 ? 'bg-accent' :
-                      'bg-muted-foreground'
-                    }`} />
-                    <span className="text-sm font-medium text-foreground">{role}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Badge variant="outline" className="text-xs">
-                      {count} employees
-                    </Badge>
-                    <div className="text-xs text-muted-foreground">
-                      {Math.round((count / totalEmployees) * 100)}%
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <CardContent className="space-y-3">
+            <InsightRow label="Employees with salary set" value={String(
+              employees.filter(e => typeof e.salary === 'number').length
+            )} />
+            <InsightRow label="Employees without manager" value={String(
+              employees.filter(e => !e.manager).length
+            )} />
+            <InsightRow label="Roles in use" value={String(
+              new Set(employees.map(e => e.role).filter(Boolean)).size
+            )} />
+            <InsightRow label="Newest employee" value={
+              (() => {
+                const newest = [...employees].sort(
+                  (a,b) => (toDate(b.createdAt)?.getTime() ?? 0) - (toDate(a.createdAt)?.getTime() ?? 0)
+                )[0];
+                return newest ? `${newest.name} ${newest.surname}` : '—';
+              })()
+            } />
           </CardContent>
         </Card>
       </div>
@@ -174,29 +231,89 @@ export default function Dashboard() {
       <Card className="hover-lift">
         <CardHeader>
           <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Common management tasks</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Button variant="outline" asChild className="h-20 flex-col space-y-2 hover-glow">
-              <Link to="/employees">
-                <Users className="h-6 w-6" />
-                <span>View All Employees</span>
-              </Link>
-            </Button>
-            <Button variant="outline" asChild className="h-20 flex-col space-y-2 hover-glow">
-              <Link to="/org-chart">
-                <Building2 className="h-6 w-6" />
-                <span>Organization Chart</span>
-              </Link>
-            </Button>
-            <Button variant="outline" className="h-20 flex-col space-y-2 hover-glow">
-              <TrendingUp className="h-6 w-6" />
-              <span>Analytics Report</span>
-            </Button>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <ActionButton label="View All Employees" onClick={() => navigate('/employees')} />
+            <ActionButton label="Organization Chart" onClick={() => navigate('/org-chart')} />
+            {/* Add one more action if you like */}
+            <ActionButton label="Export CSV" onClick={() => navigate('/employees')} />
           </div>
         </CardContent>
       </Card>
     </div>
   );
+}
+
+/* ---------------- helpers & small components ---------------- */
+
+function KpiCard({
+  title,
+  value,
+  sub,
+  icon,
+  className = '',
+}: {
+  title: string;
+  value: string;
+  sub?: string | JSX.Element;
+  icon?: string;
+  className?: string;
+}) {
+  return (
+    <Card className={`hover-lift ${className}`}>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2">
+          {icon ? <span className="text-lg">{icon}</span> : null}
+          <span>{title}</span>
+        </CardTitle>
+        {sub ? <div className="text-sm text-muted-foreground">{sub}</div> : null}
+      </CardHeader>
+      <CardContent>
+        <div className="text-3xl font-semibold tracking-tight">{value}</div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ActionButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <Button
+      variant="outline"
+      className="w-full h-20 rounded-2xl hover:shadow-md transition-shadow"
+      onClick={onClick}
+    >
+      {label}
+    </Button>
+  );
+}
+
+function InsightRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <div className="text-sm text-muted-foreground">{label}</div>
+      <div className="text-sm font-medium">{value}</div>
+    </div>
+  );
+}
+
+function deltaBadge(delta: number, suffix: string) {
+  const positive = delta > 0;
+  const neutral = delta === 0;
+  const cls = positive
+    ? 'text-green-600'
+    : neutral
+    ? 'text-muted-foreground'
+    : 'text-red-600';
+  const sign = positive ? '+' : '';
+  return <span className={cls}>{`${sign}${delta} ${suffix}`}</span>;
+}
+
+function formatMoney(n: number) {
+  return n.toLocaleString('en-US');
+}
+
+function formatDate(d: Date | string) {
+  const date = d instanceof Date ? d : new Date(d);
+  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }

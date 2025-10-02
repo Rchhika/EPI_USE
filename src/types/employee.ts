@@ -8,6 +8,10 @@ export interface Employee {
   salary: number;
   role: string;
   manager?: string; // Employee ID of manager
+
+  /** Added to match backend schema */
+  isActive?: boolean;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -82,7 +86,7 @@ export const EMPLOYEE_ROLES = [
   'Sales Manager',
   'HR Manager',
   'Finance Manager',
-  'Intern'
+  'Intern',
 ] as const;
 
 export type EmployeeRole = typeof EMPLOYEE_ROLES[number];
