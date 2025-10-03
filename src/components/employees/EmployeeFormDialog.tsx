@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { EmployeeAvatar } from "@/components/ui/avatar";
 import { EMPLOYEE_ROLES } from "@/types/employee";
 
 /**
@@ -112,6 +113,25 @@ export default function EmployeeFormDialog({
         <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 overflow-visible">
+          {/* Avatar Preview */}
+          {(values.name || values.surname || values.email) && (
+            <div className="flex items-center space-x-4 p-4 bg-muted/30 rounded-lg border border-border/50">
+              <EmployeeAvatar 
+                employee={{
+                  name: values.name || '',
+                  surname: values.surname || '',
+                  email: values.email || ''
+                }} 
+                size={48}
+                className="flex-shrink-0"
+              />
+              <div className="text-sm text-muted-foreground">
+                <div className="font-medium">Avatar Preview</div>
+                <div className="text-xs">Gravatar will be automatically generated from email</div>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>Name</Label>

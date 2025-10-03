@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UserPlus, Download } from "lucide-react";
@@ -12,6 +13,8 @@ import EmployeeFormDialog, { EmployeeFormValues } from "@/components/employees/E
 type Mode = { type: "create" } | { type: "edit"; employee: Employee } | null;
 
 export default function Employees() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  
   const {
     isLoading,
     error,
@@ -32,6 +35,14 @@ export default function Employees() {
 
   const [exporting, setExporting] = useState(false);
   const [formMode, setFormMode] = useState<Mode>(null);
+
+  // Handle URL search parameter for direct navigation from org chart
+  useEffect(() => {
+    const searchFromUrl = searchParams.get('search');
+    if (searchFromUrl && searchFromUrl !== filters.search) {
+      setFilters(prev => ({ ...prev, search: searchFromUrl }));
+    }
+  }, [searchParams, filters.search, setFilters]);
 
   // Managers list for the dialog (id + display name)
   const managers = useMemo(

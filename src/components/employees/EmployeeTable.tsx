@@ -27,7 +27,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ArrowUpDown, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
-import { getGravatarUrl, getInitials } from '@/utils/gravatar';
+import { EmployeeAvatar } from '@/components/ui/avatar';
 import { format } from 'date-fns';
 
 interface EmployeeTableProps {
@@ -59,14 +59,11 @@ export default function EmployeeTable({
         const employee = row.original;
         return (
           <div className="flex items-center justify-center">
-            <div className="relative">
-              <img
-                src={getGravatarUrl(employee.email, 32)}
-                alt={`${employee.name} ${employee.surname}`}
-                className="h-8 w-8 rounded-full shadow-custom-sm"
-              />
-              <div className="absolute inset-0 rounded-full bg-gradient-primary opacity-10"></div>
-            </div>
+            <EmployeeAvatar 
+              employee={employee} 
+              size={32}
+              className="shadow-custom-sm"
+            />
           </div>
         );
       },

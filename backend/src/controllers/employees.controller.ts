@@ -26,6 +26,15 @@ export async function listEmployees(req: Request, res: Response, next: NextFunct
             { email:     { $regex: q, $options: 'i' } },
             { role:      { $regex: q, $options: 'i' } },
             { employeeNumber: { $regex: q, $options: 'i' } },
+            // Add combined name search for full names like "John Doe"
+            { $expr: { 
+                $regexMatch: { 
+                  input: { $concat: ["$firstName", " ", "$surname"] }, 
+                  regex: q, 
+                  options: "i" 
+                } 
+              } 
+            },
           ],
         }
       : {};

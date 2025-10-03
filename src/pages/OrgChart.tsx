@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import ReactFlow, {
   Node,
@@ -14,6 +14,9 @@ import ReactFlow, {
   NodeChange,
   BackgroundVariant,
   Position,
+  EdgeTypes,
+  ReactFlowInstance,
+  Handle,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import dagre from 'dagre';
@@ -25,9 +28,13 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { EmployeeAvatar } from '@/components/ui/avatar';
 import { listAllEmployeesForOrg } from '@/features/auth/employees/api';
 import { EMPLOYEE_ROLES } from '@/types/employee';
 import type { Employee } from '@/types/employee';
+import { Copy, ExternalLink, Users } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 // Node dimensions
 const NODE_WIDTH = 200;
@@ -48,26 +55,84 @@ const ROLE_COLORS: Record<string, string> = {
 
 const getRoleColor = (role: string) => ROLE_COLORS[role] || 'bg-gradient-to-r from-gray-500 to-gray-600';
 
-// Custom Node Component
-const EmployeeNode = ({ data }: { data: Employee }) => {
+// Custom Node Component with collapse functionality
+const EmployeeNode = ({ data }: { data: Employee & { level?: number; hasChildren?: boolean; isCollapsed?: boolean } }) => {
+  const isRoot = data.level === 0;
+  const isOrphaned = data.level === -1;
+  
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.3 }}
-      className="bg-card border border-border rounded-xl shadow-custom-md hover:shadow-custom-lg transition-all duration-200 hover:scale-105"
+      className={`bg-card border border-border rounded-xl shadow-custom-md hover:shadow-custom-lg transition-all duration-200 hover:scale-105 ${
+        isRoot ? 'ring-2 ring-primary/30' : ''
+      } ${isOrphaned ? 'opacity-75 border-dashed' : ''}`}
       style={{ width: NODE_WIDTH, height: NODE_HEIGHT }}
     >
-      <div className={`h-2 w-full rounded-t-xl ${getRoleColor(data.role || '')}`} />
-      <div className="p-3">
-        <div className="font-semibold text-sm text-card-foreground truncate">
-          {data.name} {data.surname}
+      {/* Source Handle - for outgoing connections (manager to employees) */}
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="bottom"
+        style={{ 
+          background: 'hsl(var(--primary))', 
+          width: 8, 
+          height: 8,
+          border: '2px solid hsl(var(--background))'
+        }}
+      />
+      
+      {/* Target Handle - for incoming connections (employee from manager) */}
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="top"
+        style={{ 
+          background: 'hsl(var(--primary))', 
+          width: 8, 
+          height: 8,
+          border: '2px solid hsl(var(--background))'
+        }}
+      />
+
+      <div className={`h-2 w-full rounded-t-xl ${getRoleColor(data.role || '')} ${
+        isRoot ? 'h-3' : ''
+      }`} />
+      {/* Employee information */}
+      <div className="p-3 h-full flex flex-col justify-between">
+        <div className="flex items-center space-x-3">
+          <EmployeeAvatar 
+            employee={data} 
+            size={40}
+            className="flex-shrink-0"
+          />
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-sm text-card-foreground truncate">
+              {data.name} {data.surname}
+              {isRoot && <span className="ml-1 text-xs text-primary">👑</span>}
+              {isOrphaned && <span className="ml-1 text-xs text-muted-foreground">⚠️</span>}
+              {data.hasChildren && (
+                <span className="ml-1 text-xs text-muted-foreground">
+                  {data.isCollapsed ? '▼' : '▲'}
+                </span>
+              )}
+            </div>
+            <div className="text-xs text-muted-foreground truncate mb-1">
+              {data.role}
+            </div>
+          </div>
         </div>
-        <div className="text-xs text-muted-foreground truncate mb-1">
-          {data.role}
-        </div>
-        <div className="text-xs text-muted-foreground/70">
-          #{data.employeeNumber}
+        
+        <div className="mt-2">
+          <div className="text-xs text-muted-foreground/70">
+            #{data.employeeNumber}
+          </div>
+          {data.level !== undefined && data.level >= 0 && (
+            <div className="text-xs text-muted-foreground/50 mt-1">
+              Level {data.level + 1}
+            </div>
+          )}
         </div>
       </div>
     </motion.div>
@@ -78,18 +143,38 @@ const nodeTypes = {
   employee: EmployeeNode,
 };
 
-// Layout function using dagre
+// Enhanced layout function for proper hierarchical tree structure
 const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'TB') => {
   const dagreGraph = new dagre.graphlib.Graph();
   dagreGraph.setDefaultEdgeLabel(() => ({}));
-  dagreGraph.setGraph({ rankdir: direction, nodesep: 50, ranksep: 100 });
+  
+  // Enhanced layout configuration for better tree structure
+  dagreGraph.setGraph({ 
+    rankdir: direction, 
+    nodesep: 100,        // Increased horizontal spacing between nodes
+    ranksep: 180,        // Increased vertical spacing between levels
+    align: 'UL',         // Align to upper-left
+    acyclicer: 'greedy', // Handle cycles gracefully
+    ranker: 'tight-tree', // Use tight-tree ranking for better hierarchy
+    edgesep: 20,         // Edge separation
+    marginx: 50,         // Horizontal margin
+    marginy: 50          // Vertical margin
+  });
 
   nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
+    dagreGraph.setNode(node.id, { 
+      width: NODE_WIDTH, 
+      height: NODE_HEIGHT,
+      // Add padding for better visual separation
+      padding: 25
+    });
   });
 
   edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
+    dagreGraph.setEdge(edge.source, edge.target, {
+      minlen: 2, // Minimum edge length
+      weight: 1  // Edge weight for layout
+    });
   });
 
   dagre.layout(dagreGraph);
@@ -112,9 +197,12 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'TB') => 
 
 export default function OrgChart() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedRole, setSelectedRole] = useState<string>('');
+  const [selectedRole, setSelectedRole] = useState<string>('all');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set());
+  const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
+  const navigate = useNavigate();
 
   // Fetch all employees for org chart
   const { data: employees = [], isLoading, error } = useQuery({
@@ -131,7 +219,7 @@ export default function OrgChart() {
     return map;
   }, [employees]);
 
-  // Build graph structure
+  // Build graph structure with collapsible subtrees
   const { nodes, edges } = useMemo(() => {
     if (!employees.length) return { nodes: [], edges: [] };
 
@@ -147,44 +235,143 @@ export default function OrgChart() {
       );
     }
     
-    if (selectedRole) {
+    if (selectedRole && selectedRole !== 'all') {
       filteredEmployees = filteredEmployees.filter(emp => emp.role === selectedRole);
     }
 
-    // Create nodes
-    const nodes: Node[] = filteredEmployees.map((emp) => ({
-      id: emp.employeeNumber || emp.id,
-      type: 'employee',
-      data: emp,
-      position: { x: 0, y: 0 }, // Will be updated by dagre layout
-    }));
+    // Helper function to get employee ID (prefer employeeNumber, fallback to id)
+    const getEmployeeId = (emp: Employee) => emp.employeeNumber || emp.id;
 
-    // Create edges (manager -> employee)
-    const edges: Edge[] = [];
-    const processedEdges = new Set<string>();
-
-    filteredEmployees.forEach((emp) => {
+    // Build hierarchy map
+    const hierarchyMap = new Map<string, Employee[]>();
+    const employeeMap = new Map<string, Employee>();
+    
+    filteredEmployees.forEach(emp => {
+      const empId = getEmployeeId(emp);
+      employeeMap.set(empId, emp);
+      
       if (emp.manager) {
-        const managerEmp = employeeMap.get(emp.manager);
-        if (managerEmp && filteredEmployees.includes(managerEmp)) {
-          const edgeId = `${emp.manager}-${emp.employeeNumber || emp.id}`;
-          if (!processedEdges.has(edgeId)) {
-            edges.push({
-              id: edgeId,
-              source: emp.manager,
-              target: emp.employeeNumber || emp.id,
-              type: 'smoothstep',
-              animated: true,
-              style: { stroke: 'hsl(var(--primary))', strokeWidth: 2 },
-            });
-            processedEdges.add(edgeId);
-          }
+        if (!hierarchyMap.has(emp.manager)) {
+          hierarchyMap.set(emp.manager, []);
         }
+        hierarchyMap.get(emp.manager)!.push(emp);
       }
     });
 
-    return getLayoutedElements(nodes, edges);
-  }, [employees, searchTerm, selectedRole, employeeMap]);
+    // Find root employees (no manager or manager not in filtered list)
+    const rootEmployees = filteredEmployees.filter(emp => {
+      if (!emp.manager) return true;
+      const managerExists = filteredEmployees.some(m => getEmployeeId(m) === emp.manager);
+      return !managerExists;
+    });
+
+    // Recursive function to build visible nodes and edges
+    const buildVisibleHierarchy = (
+      employee: Employee, 
+      level: number = 0, 
+      visibleNodes: Node[] = [], 
+      visibleEdges: Edge[] = []
+    ): { nodes: Node[], edges: Edge[] } => {
+      const empId = getEmployeeId(employee);
+      const isCollapsed = collapsedNodes.has(empId);
+      const directReports = hierarchyMap.get(empId) || [];
+      
+      // Add current employee node
+      visibleNodes.push({
+        id: empId,
+        type: 'employee',
+        data: { 
+          ...employee, 
+          level,
+          hasChildren: directReports.length > 0,
+          isCollapsed
+        },
+        position: { x: 0, y: 0 }, // Will be positioned by dagre
+        draggable: false, // Disable node dragging to preserve layout
+      });
+
+      // If not collapsed, add direct reports
+      if (!isCollapsed) {
+        directReports.forEach(report => {
+          const reportId = getEmployeeId(report);
+          
+          // Add edge
+          visibleEdges.push({
+            id: `${empId}-${reportId}`,
+            source: empId,
+            target: reportId,
+            sourceHandle: 'bottom',  // Connect from bottom handle of manager
+            targetHandle: 'top',     // Connect to top handle of employee
+            type: 'straight', // Use straight lines for clearer tree structure
+            animated: false,  // Disable animation for cleaner look
+            style: { 
+              stroke: level === 0 ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))', 
+              strokeWidth: level === 0 ? 3 : 2,
+              strokeDasharray: '0' // Solid lines for all levels
+            },
+            label: level === 0 ? 'Reports to' : '',
+            labelStyle: {
+              fontSize: '11px',
+              fontWeight: '600',
+              fill: 'hsl(var(--muted-foreground))'
+            },
+            labelBgStyle: {
+              fill: 'hsl(var(--card))',
+              fillOpacity: 0.9,
+              stroke: 'hsl(var(--border))',
+              strokeWidth: 1,
+              borderRadius: 4
+            }
+          });
+
+          // Recursively build hierarchy for this report
+          buildVisibleHierarchy(report, level + 1, visibleNodes, visibleEdges);
+        });
+      }
+
+      return { nodes: visibleNodes, edges: visibleEdges };
+    };
+
+    // Build hierarchy starting from root employees
+    const allNodes: Node[] = [];
+    const allEdges: Edge[] = [];
+
+    if (rootEmployees.length === 0) {
+      // Fallback: if no clear roots, treat all as individual nodes
+      filteredEmployees.forEach(emp => {
+        allNodes.push({
+          id: getEmployeeId(emp),
+          type: 'employee',
+          data: { ...emp, level: -1 },
+          position: { x: 0, y: 0 },
+          draggable: false,
+        });
+      });
+    } else {
+      // Build hierarchy starting from roots
+      rootEmployees.forEach(rootEmp => {
+        buildVisibleHierarchy(rootEmp, 0, allNodes, allEdges);
+      });
+    }
+
+    // Handle any remaining employees that weren't processed (orphaned employees)
+    const processedIds = new Set(allNodes.map(n => n.id));
+    const orphanedEmployees = filteredEmployees.filter(emp => 
+      !processedIds.has(getEmployeeId(emp))
+    );
+
+    orphanedEmployees.forEach(emp => {
+      allNodes.push({
+        id: getEmployeeId(emp),
+        type: 'employee',
+        data: { ...emp, level: -1 }, // Mark as orphaned
+        position: { x: 0, y: 0 },
+        draggable: false,
+      });
+    });
+
+    return getLayoutedElements(allNodes, allEdges);
+  }, [employees, searchTerm, selectedRole, employeeMap, collapsedNodes]);
 
   const [reactFlowNodes, setNodes, onNodesChange] = useNodesState(nodes);
   const [reactFlowEdges, setEdges, onEdgesChange] = useEdgesState(edges);
@@ -193,7 +380,36 @@ export default function OrgChart() {
   useEffect(() => {
     setNodes(nodes);
     setEdges(edges);
+    
+    // Fit view after layout changes
+    if (reactFlowInstance.current) {
+      setTimeout(() => {
+        reactFlowInstance.current?.fitView({ padding: 0.2 });
+      }, 100);
+    }
   }, [nodes, edges, setNodes, setEdges]);
+
+  // Handle window resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (reactFlowInstance.current) {
+        setTimeout(() => {
+          reactFlowInstance.current?.fitView({ padding: 0.2 });
+        }, 100);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const onInit = useCallback((instance: ReactFlowInstance) => {
+    reactFlowInstance.current = instance;
+    // Initial fit view
+    setTimeout(() => {
+      instance.fitView({ padding: 0.2 });
+    }, 100);
+  }, []);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -201,20 +417,39 @@ export default function OrgChart() {
   );
 
   const handleNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
-    setSelectedEmployee(node.data as Employee);
-    setIsSheetOpen(true);
+    const data = node.data as Employee & { hasChildren?: boolean };
+    
+    // If node has children, toggle collapse/expand
+    if (data.hasChildren) {
+      setCollapsedNodes(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(node.id)) {
+          newSet.delete(node.id);
+        } else {
+          newSet.add(node.id);
+        }
+        return newSet;
+      });
+    } else {
+      // If no children, open details sheet
+      setSelectedEmployee(data);
+      setIsSheetOpen(true);
+    }
   }, []);
 
   const handleViewInEmployees = useCallback(() => {
     if (selectedEmployee) {
-      // Navigate to employees page with search prefilled
-      window.location.href = `/employees?search=${encodeURIComponent(selectedEmployee.name + ' ' + selectedEmployee.surname)}`;
+      // Navigate to employees page with search prefilled with employee's full name
+      // Backend now supports combined name search
+      const searchQuery = `${selectedEmployee.name} ${selectedEmployee.surname}`;
+      navigate(`/employees?search=${encodeURIComponent(searchQuery)}`);
     }
-  }, [selectedEmployee]);
+  }, [selectedEmployee, navigate]);
 
   const handleCopyEmployeeNumber = useCallback(() => {
     if (selectedEmployee?.employeeNumber) {
       navigator.clipboard.writeText(selectedEmployee.employeeNumber);
+      toast.success('Employee number copied to clipboard');
     }
   }, [selectedEmployee]);
 
@@ -287,7 +522,7 @@ export default function OrgChart() {
                   <SelectValue placeholder="Filter by role" />
                 </SelectTrigger>
                 <SelectContent className="z-[9999]">
-                  <SelectItem value="">All Roles</SelectItem>
+                  <SelectItem value="all">All Roles</SelectItem>
                   {EMPLOYEE_ROLES.map((role) => (
                     <SelectItem key={role} value={role}>
                       {role}
@@ -300,7 +535,7 @@ export default function OrgChart() {
               variant="outline"
               onClick={() => {
                 setSearchTerm('');
-                setSelectedRole('');
+                setSelectedRole('all');
               }}
               className="btn-outline-polished"
             >
@@ -318,6 +553,22 @@ export default function OrgChart() {
               </Badge>
             ))}
           </div>
+
+          {/* Hierarchy Legend */}
+          <div className="flex flex-wrap gap-2 pt-2 border-t">
+            <span className="text-sm text-muted-foreground mr-2">Hierarchy:</span>
+            <Badge variant="secondary" className="text-xs">
+              <span className="mr-1">👑</span>
+              Root Level (CEO/No Manager)
+            </Badge>
+            <Badge variant="secondary" className="text-xs">
+              <span className="mr-1">⚠️</span>
+              Orphaned (Manager Missing)
+            </Badge>
+            <Badge variant="secondary" className="text-xs">
+              Level Numbers Show Depth
+            </Badge>
+          </div>
         </CardContent>
       </Card>
 
@@ -332,7 +583,7 @@ export default function OrgChart() {
                   variant="outline"
                   onClick={() => {
                     setSearchTerm('');
-                    setSelectedRole('');
+                    setSelectedRole('all');
                   }}
                 >
                   Clear Filters
@@ -348,21 +599,48 @@ export default function OrgChart() {
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
                 onNodeClick={handleNodeClick}
+                onInit={onInit}
                 nodeTypes={nodeTypes}
                 fitView
-                fitViewOptions={{ padding: 0.2 }}
+                fitViewOptions={{ 
+                  padding: 0.25,
+                  minZoom: 0.3,
+                  maxZoom: 1.2
+                }}
                 className="bg-gradient-bg"
+                defaultViewport={{ x: 0, y: 0, zoom: 0.9 }}
+                minZoom={0.3}
+                maxZoom={1.2}
+                attributionPosition="bottom-left"
+                nodesDraggable={false}
+                nodesConnectable={false}
+                elementsSelectable={true}
+                panOnDrag={true}
+                zoomOnScroll={true}
+                zoomOnPinch={true}
+                proOptions={{ hideAttribution: true }}
               >
-                <Controls className="bg-card border border-border rounded-lg z-[9998]" />
+                <Controls 
+                  className="bg-card border border-border rounded-lg z-[9998]" 
+                  showInteractive={false}
+                />
                 <MiniMap 
                   className="bg-card border border-border rounded-lg z-[9998]"
-                  nodeColor={(node) => getRoleColor(node.data?.role || '')}
+                  nodeColor={(node) => {
+                    const data = node.data as Employee & { level?: number };
+                    if (data.level === 0) return 'hsl(var(--primary))';
+                    if (data.level === -1) return 'hsl(var(--destructive))';
+                    return 'hsl(var(--muted-foreground))';
+                  }}
+                  nodeStrokeWidth={3}
+                  nodeBorderRadius={8}
+                  maskColor="hsl(var(--background) / 0.8)"
                 />
                 <Background 
                   variant={BackgroundVariant.Dots} 
-                  gap={20} 
-                  size={1}
-                  color="hsl(var(--muted-foreground) / 0.3)"
+                  gap={30} 
+                  size={1.5}
+                  color="hsl(var(--muted-foreground) / 0.2)"
                 />
               </ReactFlow>
             </div>
@@ -418,13 +696,15 @@ export default function OrgChart() {
                   onClick={handleViewInEmployees}
                   className="btn-primary-polished flex-1"
                 >
-                  View in Employees
+                  <Users className="mr-2 h-4 w-4" />
+                  View & Edit in Employees Table
                 </Button>
                 <Button
                   onClick={handleCopyEmployeeNumber}
                   variant="outline"
                   className="btn-outline-polished"
                 >
+                  <Copy className="mr-2 h-4 w-4" />
                   Copy Employee #
                 </Button>
               </div>

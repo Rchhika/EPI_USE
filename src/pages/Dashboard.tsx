@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingText } from '@/components/ui/loading';
+import { EmployeeAvatar } from '@/components/ui/avatar';
 import { useEmployees } from '@/hooks/useEmployees';
 import type { Employee } from '@/types/employee';
 
@@ -160,14 +161,21 @@ export default function Dashboard() {
               <ul className="divide-y">
                 {recentHires.map((e) => (
                   <li key={e.id} className="py-3 flex items-center justify-between">
-                    <div className="min-w-0">
-                      <div className="font-medium truncate">
-                        {e.name} {e.surname}
-                        {e.role ? (
-                          <span className="text-muted-foreground font-normal"> — {e.role}</span>
-                        ) : null}
+                    <div className="flex items-center space-x-3 min-w-0 flex-1">
+                      <EmployeeAvatar 
+                        employee={e} 
+                        size={32}
+                        className="flex-shrink-0"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium truncate">
+                          {e.name} {e.surname}
+                          {e.role ? (
+                            <span className="text-muted-foreground font-normal"> — {e.role}</span>
+                          ) : null}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">{e.email}</div>
                       </div>
-                      <div className="text-xs text-muted-foreground truncate">{e.email}</div>
                     </div>
                     <div className="text-xs text-muted-foreground ml-3 shrink-0">
                       {e.createdAt ? formatDate(e.createdAt) : ''}
