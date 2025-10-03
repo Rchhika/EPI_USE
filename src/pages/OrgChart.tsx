@@ -32,7 +32,7 @@ import { EmployeeAvatar } from '@/components/ui/avatar';
 import { listAllEmployeesForOrg } from '@/features/auth/employees/api';
 import { EMPLOYEE_ROLES } from '@/types/employee';
 import type { Employee } from '@/types/employee';
-import { Copy, ExternalLink, Users } from 'lucide-react';
+import { ExternalLink, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -56,7 +56,7 @@ const ROLE_COLORS: Record<string, string> = {
 const getRoleColor = (role: string) => ROLE_COLORS[role] || 'bg-gradient-to-r from-gray-500 to-gray-600';
 
 // Custom Node Component with collapse functionality
-const EmployeeNode = ({ data }: { data: Employee & { level?: number; hasChildren?: boolean; isCollapsed?: boolean } }) => {
+const EmployeeNode = ({ data }: { data: Employee & { level?: number } }) => {
   const isRoot = data.level === 0;
   const isOrphaned = data.level === -1;
   
@@ -112,11 +112,6 @@ const EmployeeNode = ({ data }: { data: Employee & { level?: number; hasChildren
               {data.name} {data.surname}
               {isRoot && <span className="ml-1 text-xs text-primary">👑</span>}
               {isOrphaned && <span className="ml-1 text-xs text-muted-foreground">⚠️</span>}
-              {data.hasChildren && (
-                <span className="ml-1 text-xs text-muted-foreground">
-                  {data.isCollapsed ? '▼' : '▲'}
-                </span>
-              )}
             </div>
             <div className="text-xs text-muted-foreground truncate mb-1">
               {data.role}
@@ -200,7 +195,6 @@ export default function OrgChart() {
   const [selectedRole, setSelectedRole] = useState<string>('all');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set());
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
   const navigate = useNavigate();
 
@@ -273,7 +267,6 @@ export default function OrgChart() {
       visibleEdges: Edge[] = []
     ): { nodes: Node[], edges: Edge[] } => {
       const empId = getEmployeeId(employee);
-      const isCollapsed = collapsedNodes.has(empId);
       const directReports = hierarchyMap.get(empId) || [];
       
       // Add current employee node
@@ -282,17 +275,14 @@ export default function OrgChart() {
         type: 'employee',
         data: { 
           ...employee, 
-          level,
-          hasChildren: directReports.length > 0,
-          isCollapsed
+          level
         },
         position: { x: 0, y: 0 }, // Will be positioned by dagre
         draggable: false, // Disable node dragging to preserve layout
       });
 
-      // If not collapsed, add direct reports
-      if (!isCollapsed) {
-        directReports.forEach(report => {
+      // Add direct reports
+      directReports.forEach(report => {
           const reportId = getEmployeeId(report);
           
           // Add edge
@@ -327,7 +317,6 @@ export default function OrgChart() {
           // Recursively build hierarchy for this report
           buildVisibleHierarchy(report, level + 1, visibleNodes, visibleEdges);
         });
-      }
 
       return { nodes: visibleNodes, edges: visibleEdges };
     };
@@ -371,7 +360,7 @@ export default function OrgChart() {
     });
 
     return getLayoutedElements(allNodes, allEdges);
-  }, [employees, searchTerm, selectedRole, employeeMap, collapsedNodes]);
+  }, [employees, searchTerm, selectedRole, employeeMap]);
 
   const [reactFlowNodes, setNodes, onNodesChange] = useNodesState(nodes);
   const [reactFlowEdges, setEdges, onEdgesChange] = useEdgesState(edges);
@@ -417,24 +406,11 @@ export default function OrgChart() {
   );
 
   const handleNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
-    const data = node.data as Employee & { hasChildren?: boolean };
+    const data = node.data as Employee;
     
-    // If node has children, toggle collapse/expand
-    if (data.hasChildren) {
-      setCollapsedNodes(prev => {
-        const newSet = new Set(prev);
-        if (newSet.has(node.id)) {
-          newSet.delete(node.id);
-        } else {
-          newSet.add(node.id);
-        }
-        return newSet;
-      });
-    } else {
-      // If no children, open details sheet
-      setSelectedEmployee(data);
-      setIsSheetOpen(true);
-    }
+    // Always open details sheet when clicking on any node
+    setSelectedEmployee(data);
+    setIsSheetOpen(true);
   }, []);
 
   const handleViewInEmployees = useCallback(() => {
@@ -446,12 +422,6 @@ export default function OrgChart() {
     }
   }, [selectedEmployee, navigate]);
 
-  const handleCopyEmployeeNumber = useCallback(() => {
-    if (selectedEmployee?.employeeNumber) {
-      navigator.clipboard.writeText(selectedEmployee.employeeNumber);
-      toast.success('Employee number copied to clipboard');
-    }
-  }, [selectedEmployee]);
 
   const getManagerName = (managerId: string) => {
     const manager = employeeMap.get(managerId);
@@ -691,21 +661,13 @@ export default function OrgChart() {
                 )}
               </div>
 
-              <div className="flex gap-2 pt-4">
+              <div className="pt-4">
                 <Button
                   onClick={handleViewInEmployees}
-                  className="btn-primary-polished flex-1"
+                  className="btn-primary-polished w-full"
                 >
                   <Users className="mr-2 h-4 w-4" />
                   View & Edit in Employees Table
-                </Button>
-                <Button
-                  onClick={handleCopyEmployeeNumber}
-                  variant="outline"
-                  className="btn-outline-polished"
-                >
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy Employee #
                 </Button>
               </div>
             </div>
