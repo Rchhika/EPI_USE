@@ -2,6 +2,7 @@ import * as React from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,11 +51,34 @@ export default function EmployeeFormDialog({
       name: "", surname: "", email: "",
       birthDate: "", employeeNumber: "",
       salary: "", role: "", manager: "",
-      ...defaultValues,
     },
   });
 
   const values = form.watch();
+
+  // Reset form when defaultValues change (for edit mode)
+  useEffect(() => {
+    if (defaultValues) {
+      form.reset(defaultValues);
+    } else {
+      form.reset({
+        name: "", surname: "", email: "",
+        birthDate: "", employeeNumber: "",
+        salary: "", role: "", manager: "",
+      });
+    }
+  }, [defaultValues, form]);
+
+  // Reset form when dialog closes
+  useEffect(() => {
+    if (!open) {
+      form.reset({
+        name: "", surname: "", email: "",
+        birthDate: "", employeeNumber: "",
+        salary: "", role: "", manager: "",
+      });
+    }
+  }, [open, form]);
 
   // Explicitly type vals to EmployeeFormValues
   const handleSubmit = form.handleSubmit(async (vals) => {
@@ -65,7 +89,12 @@ export default function EmployeeFormDialog({
     try {
       await onSubmit(payload);
       onOpenChange(false);        
-      form.reset();
+      // Reset form to default values after successful submit
+      form.reset({
+        name: "", surname: "", email: "",
+        birthDate: "", employeeNumber: "",
+        salary: "", role: "", manager: "",
+      });
     } catch (err: any) {
         const msg = err?.message || 'Failed to save employee';
         if (/employee number/i.test(msg)) {
@@ -82,23 +111,23 @@ export default function EmployeeFormDialog({
       <DialogContent className="max-w-lg">
         <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 overflow-visible">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>Name</Label>
-              <Input {...form.register("name")} />
+              <Input {...form.register("name")} className="input-solid" />
               <FieldError msg={form.formState.errors.name?.message} />
             </div>
             <div>
               <Label>Surname</Label>
-              <Input {...form.register("surname")} />
+              <Input {...form.register("surname")} className="input-solid" />
               <FieldError msg={form.formState.errors.surname?.message} />
             </div>
           </div>
 
           <div>
             <Label>Email</Label>
-            <Input type="email" {...form.register("email")} />
+            <Input type="email" {...form.register("email")} className="input-solid" />
             <FieldError msg={form.formState.errors.email?.message} />
           </div>
 
@@ -109,12 +138,13 @@ export default function EmployeeFormDialog({
                 type="date"
                 value={values.birthDate ?? ""}
                 onChange={(e) => form.setValue("birthDate", e.target.value)}
+                className="input-solid"
               />
               <FieldError msg={form.formState.errors.birthDate?.message} />
             </div>
             <div>
               <Label>Employee #</Label>
-              <Input {...form.register("employeeNumber")} />
+              <Input {...form.register("employeeNumber")} className="input-solid" />
               <FieldError msg={form.formState.errors.employeeNumber?.message} />
             </div>
           </div>
@@ -122,7 +152,7 @@ export default function EmployeeFormDialog({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>Salary</Label>
-              <Input type="number" step="1" inputMode="numeric" {...form.register("salary")} />
+              <Input type="number" step="1" inputMode="numeric" {...form.register("salary")} className="input-solid" />
               <FieldError msg={form.formState.errors.salary?.message?.toString()} />
             </div>
             <div>
@@ -131,8 +161,10 @@ export default function EmployeeFormDialog({
                 value={values.role || undefined}
                 onValueChange={(v) => form.setValue("role", v)}
               >
-                <SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger>
-                <SelectContent>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a role" className="truncate text-center" />
+                </SelectTrigger>
+                <SelectContent position="popper">
                   {EMPLOYEE_ROLES.map((r) => (
                     <SelectItem key={r} value={r}>{r}</SelectItem>
                   ))}
@@ -148,8 +180,10 @@ export default function EmployeeFormDialog({
               value={values.manager || undefined}
               onValueChange={(v) => form.setValue("manager", v)}
             >
-              <SelectTrigger className="select-trigger"><SelectValue placeholder="Select a manager" /></SelectTrigger>
-              <SelectContent className="select-content scrollbar-thin">
+              <SelectTrigger>
+                <SelectValue placeholder="Select a manager" className="truncate text-center" />
+              </SelectTrigger>
+              <SelectContent position="popper">
                 <SelectItem value="__none__">No manager</SelectItem>
                 {managers.map(m => (
                   <SelectItem key={m.id} value={m.id}>
@@ -161,8 +195,8 @@ export default function EmployeeFormDialog({
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={submitting}>{submitting ? "Saving…" : "Save"}</Button>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="btn-outline-polished">Cancel</Button>
+            <Button type="submit" disabled={submitting} className="btn-primary-polished">{submitting ? "Saving…" : "Save"}</Button>
           </div>
         </form>
       </DialogContent>

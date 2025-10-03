@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { LoadingText } from '@/components/ui/loading';
 import { useEmployees } from '@/hooks/useEmployees';
 import type { Employee } from '@/types/employee';
 
@@ -141,7 +142,7 @@ export default function Dashboard() {
       {/* Middle Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Hires */}
-        <Card className="hover-lift">
+        <Card className="card-premium">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2">
               <span>Recent Hires</span>
@@ -152,7 +153,7 @@ export default function Dashboard() {
             {error ? (
               <p className="text-sm text-red-600">Failed to load data.</p>
             ) : isLoading ? (
-              <p className="text-sm text-muted-foreground">Loading…</p>
+              <LoadingText variant="futuristic" text="Loading recent hires..." />
             ) : recentHires.length === 0 ? (
               <p className="text-sm text-muted-foreground">No new hires in the last 90 days.</p>
             ) : (
@@ -176,7 +177,7 @@ export default function Dashboard() {
               </ul>
             )}
             <div className="pt-4">
-              <Button variant="outline" size="sm" onClick={() => navigate('/employees')}>
+              <Button variant="outline" size="sm" onClick={() => navigate('/employees')} className="btn-outline-polished">
                 View all employees
               </Button>
             </div>
@@ -184,7 +185,7 @@ export default function Dashboard() {
         </Card>
 
         {/* At a Glance */}
-        <Card className="hover-lift">
+        <Card className="card-premium">
           <CardHeader className="pb-3">
             <CardTitle>At a Glance</CardTitle>
             <p className="text-sm text-muted-foreground">Quick insights</p>
@@ -218,7 +219,7 @@ export default function Dashboard() {
       </div>
 
       {/* Quick Actions */}
-      <Card className="hover-lift">
+      <Card className="card-premium">
         <CardHeader>
           <CardTitle>Quick Actions</CardTitle>
         </CardHeader>
@@ -250,7 +251,7 @@ function KpiCard({
   className?: string;
 }) {
   return (
-    <Card className={`hover-lift ${className}`}>
+    <Card className={`card-premium ${className}`}>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2">
           {icon ? <span className="text-lg">{icon}</span> : null}
@@ -269,7 +270,7 @@ function ActionButton({ label, onClick }: { label: string; onClick: () => void }
   return (
     <Button
       variant="outline"
-      className="w-full h-20 rounded-2xl hover:shadow-md transition-shadow"
+      className="w-full h-20 rounded-2xl btn-outline-polished"
       onClick={onClick}
     >
       {label}

@@ -54,6 +54,10 @@
     --gradient-accent: linear-gradient(135deg, hsl(45 93% 58%), hsl(45 93% 70%));
     --gradient-hero: linear-gradient(135deg, hsl(242 47% 24%) 0%, hsl(242 47% 35%) 50%, hsl(242 100% 70%) 100%);
     --gradient-card: linear-gradient(145deg, hsl(0 0% 100%) 0%, hsl(210 25% 99%) 100%);
+    --gradient-bg: linear-gradient(135deg, hsl(210 20% 98%) 0%, hsl(210 25% 96%) 50%, hsl(210 30% 94%) 100%);
+    --gradient-bg-pattern: radial-gradient(circle at 20% 80%, hsl(242 47% 24% / 0.03) 0%, transparent 50%),
+                           radial-gradient(circle at 80% 20%, hsl(142 76% 36% / 0.03) 0%, transparent 50%),
+                           radial-gradient(circle at 40% 40%, hsl(45 93% 58% / 0.02) 0%, transparent 50%);
     
     /* Shadows */
     --shadow-sm: 0 2px 4px hsl(242 47% 24% / 0.05);
@@ -110,6 +114,10 @@
     --gradient-accent: linear-gradient(135deg, hsl(45 93% 70%), hsl(45 93% 80%));
     --gradient-hero: linear-gradient(135deg, hsl(242 100% 70%) 0%, hsl(242 100% 80%) 50%, hsl(45 93% 70%) 100%);
     --gradient-card: linear-gradient(145deg, hsl(222 47% 8%) 0%, hsl(222 47% 10%) 100%);
+    --gradient-bg: linear-gradient(135deg, hsl(222 47% 6%) 0%, hsl(222 47% 8%) 50%, hsl(222 47% 10%) 100%);
+    --gradient-bg-pattern: radial-gradient(circle at 20% 80%, hsl(242 100% 70% / 0.05) 0%, transparent 50%),
+                           radial-gradient(circle at 80% 20%, hsl(142 76% 45% / 0.05) 0%, transparent 50%),
+                           radial-gradient(circle at 40% 40%, hsl(45 93% 70% / 0.03) 0%, transparent 50%);
     
     --shadow-sm: 0 2px 4px hsl(0 0% 0% / 0.3);
     --shadow-md: 0 4px 12px hsl(0 0% 0% / 0.4);
@@ -124,7 +132,9 @@
   }
 
   body {
-    @apply bg-background text-foreground font-inter antialiased;
+    @apply bg-gradient-bg text-foreground font-inter antialiased;
+    background-image: var(--gradient-bg-pattern);
+    background-attachment: fixed;
   }
 
   /* Better focus ring defaults */
@@ -162,6 +172,8 @@
   .bg-gradient-accent { background: var(--gradient-accent); }
   .bg-gradient-hero { background: var(--gradient-hero); }
   .bg-gradient-card { background: var(--gradient-card); }
+  .bg-gradient-bg { background: var(--gradient-bg); }
+  .bg-gradient-pattern { background: var(--gradient-bg-pattern); }
 
   /* Shadows */
   .shadow-custom-sm { box-shadow: var(--shadow-sm); }
@@ -227,21 +239,30 @@
   -------------------------------------------------------------- */
   .select-trigger {
     @apply h-10 w-full rounded-md border border-input bg-card text-foreground shadow-sm
-           focus:ring-2 focus:ring-primary/30 focus:border-primary;
+           focus:ring-2 focus:ring-primary/30 focus:border-primary
+           hover:border-primary/50 transition-colors;
   }
   .select-content {
-    @apply bg-card text-foreground border border-border rounded-lg shadow-custom-md;
+    @apply bg-card text-foreground border border-border rounded-lg shadow-custom-md
+           data-[state=open]:animate-in data-[state=closed]:animate-out 
+           data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 
+           data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95
+           max-h-60 overflow-auto scrollbar-thin;
   }
   .select-item {
     @apply relative flex cursor-pointer select-none items-center rounded-md
-           py-2 pl-8 pr-2 outline-none
-           data-[disabled]:pointer-events-none data-[disabled]:opacity-50;
+           py-2.5 pl-8 pr-3 outline-none transition-all duration-200
+           data-[disabled]:pointer-events-none data-[disabled]:opacity-50
+           hover:bg-muted/90 focus:bg-muted/90 focus:ring-2 focus:ring-primary/20;
   }
   .select-item[data-highlighted] {
     @apply bg-muted text-foreground;
   }
   .select-item[data-state='checked'] {
-    @apply bg-primary/10 text-primary;
+    @apply bg-primary/10 text-primary font-medium;
+  }
+  .select-item[data-state='checked'] .select-item-indicator {
+    @apply text-primary;
   }
 
   /* --------------------------------------------------------------
@@ -256,13 +277,45 @@
   }
 
   /* --------------------------------------------------------------
+     DROPDOWN MENU: Enhanced readability and animations
+  -------------------------------------------------------------- */
+  .dropdown-content {
+    @apply bg-card text-foreground border border-border rounded-lg shadow-custom-md
+           data-[state=open]:animate-in data-[state=closed]:animate-out 
+           data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 
+           data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95
+           max-h-60 overflow-auto scrollbar-thin;
+  }
+  .dropdown-item {
+    @apply relative flex cursor-pointer select-none items-center rounded-md
+           px-3 py-2.5 text-sm outline-none transition-all duration-200
+           data-[disabled]:pointer-events-none data-[disabled]:opacity-50
+           hover:bg-muted/90 focus:bg-muted/90 focus:ring-2 focus:ring-primary/20;
+  }
+  .dropdown-item[data-highlighted] {
+    @apply bg-muted text-foreground;
+  }
+  .dropdown-item[data-state='checked'] {
+    @apply bg-primary/10 text-primary font-medium;
+  }
+
+  /* --------------------------------------------------------------
      CARD POLISH (Employee card / dashboard)
   -------------------------------------------------------------- */
   .card-elevated {
-    @apply rounded-xl border border-border bg-card shadow-custom-sm hover:shadow-custom-md transition;
+    @apply rounded-xl border border-border bg-card shadow-custom-sm hover:shadow-custom-md transition-all duration-300;
   }
   .card-section {
     @apply p-4 sm:p-6;
+  }
+  .card-polished {
+    @apply rounded-xl border border-border bg-card shadow-custom-sm hover:shadow-custom-md 
+           hover:scale-[1.01] transition-all duration-300 ease-out;
+  }
+  .card-premium {
+    @apply rounded-xl border border-border bg-card shadow-custom-sm hover:shadow-custom-lg 
+           hover:scale-[1.02] hover:-translate-y-1 transition-all duration-300 ease-out
+           backdrop-blur-sm bg-card/95;
   }
 
   /* --------------------------------------------------------------
@@ -273,10 +326,24 @@
   }
   .btn-soft {
     @apply rounded-md border border-input bg-card hover:bg-muted text-foreground shadow-sm
-           h-9 px-3 transition;
+           h-9 px-3 transition-all duration-200 hover:shadow-md;
   }
   .btn-soft-primary {
     @apply bg-primary/10 text-primary border-primary/20 hover:bg-primary/15;
+  }
+  .btn-primary-polished {
+    @apply bg-gradient-primary text-primary-foreground shadow-custom-sm hover:shadow-custom-md
+           hover:opacity-90 hover:scale-[1.02] transition-all duration-200 font-medium
+           active:scale-[0.98] active:shadow-custom-sm;
+  }
+  .btn-outline-polished {
+    @apply border border-border bg-card text-foreground shadow-sm hover:bg-muted/50
+           hover:border-primary/50 hover:shadow-md hover:scale-[1.01] transition-all duration-200
+           active:scale-[0.99] active:shadow-sm;
+  }
+  .btn-ghost-polished {
+    @apply text-foreground hover:bg-muted/50 hover:text-foreground transition-all duration-200
+           hover:scale-[1.01] active:scale-[0.99];
   }
 }
 
@@ -284,16 +351,27 @@
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
+    scrollbar-color: hsl(var(--primary) / 0.3) transparent;
   }
   .scrollbar-thin::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--muted-foreground) / 0.35);
+    background: linear-gradient(180deg, hsl(var(--primary) / 0.4), hsl(var(--primary) / 0.6));
     border-radius: 9999px;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, hsl(var(--primary) / 0.6), hsl(var(--primary) / 0.8));
+    transform: scale(1.1);
   }
   .scrollbar-thin::-webkit-scrollbar-track {
+    background-color: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-corner {
     background-color: transparent;
   }
 }
@@ -301,10 +379,17 @@
 @layer components {
   /* Solid dialog surface + strong overlay */
   .dialog-content-solid {
-    @apply z-50 bg-card border border-border rounded-xl shadow-custom-lg;
+    @apply fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-card p-6 shadow-custom-lg rounded-xl
+           data-[state=open]:animate-in data-[state=closed]:animate-out 
+           data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 
+           data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 
+           data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] 
+           data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%];
   }
   .dialog-overlay-strong {
-    @apply fixed inset-0 bg-black/60;
+    @apply fixed inset-0 bg-black/60 backdrop-blur-sm
+           data-[state=open]:animate-in data-[state=closed]:animate-out 
+           data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0;
   }
 
   /* Solid input surface (prevents see-through in modals) */
@@ -314,5 +399,37 @@
   /* Solid select content (Radix) */
   .select-content-solid {
     @apply bg-card border border-border rounded-lg shadow-custom-md;
+  }
+
+  /* Focus ring improvements */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2;
+  }
+  .focus-ring-inset {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-inset;
+  }
+
+  /* Futuristic Loading Components */
+  .loading-spinner {
+    @apply animate-loading-spinner;
+  }
+  .loading-dots {
+    @apply animate-loading-dots;
+  }
+  .futuristic-pulse {
+    @apply animate-futuristic-pulse;
+  }
+  .futuristic-glow {
+    @apply animate-futuristic-glow;
+  }
+  .futuristic-slide {
+    @apply animate-futuristic-slide;
+  }
+
+  /* Enhanced dropdown animations */
+  .dropdown-futuristic {
+    @apply data-[state=open]:animate-futuristic-slide data-[state=closed]:animate-out 
+           data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 
+           data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95;
   }
 }

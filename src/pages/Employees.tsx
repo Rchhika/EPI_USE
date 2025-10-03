@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UserPlus, Download } from "lucide-react";
 import EmployeeTable from "@/components/employees/EmployeeTable";
 import EmployeeFilters from "@/components/employees/EmployeeFilters";
+import { LoadingText } from "@/components/ui/loading";
 import { useEmployees } from "@/hooks/useEmployees";
 import type { Employee } from "@/types/employee";
 import EmployeeFormDialog, { EmployeeFormValues } from "@/components/employees/EmployeeFormDialog";
@@ -79,10 +80,6 @@ export default function Employees() {
     await refetch();
   };
 
-  const handleView = (employee: Employee) => {
-    // Optional: open a side panel or details modal
-    console.log("View employee:", employee);
-  };
 
   const exportCSV = () => {
     try {
@@ -141,15 +138,15 @@ export default function Employees() {
     return (
       <div className="space-y-6">
         <Header onExport={exportCSV} onAdd={() => setFormMode({ type: "create" })} exporting={exporting} total={pagination?.total} />
-        <Card className="hover-lift">
+        <Card className="card-polished">
           <CardHeader>
             <CardTitle>Filters</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-sm text-muted-foreground">Loading…</div>
+            <LoadingText variant="futuristic" text="Loading filters..." />
           </CardContent>
         </Card>
-        <div className="text-sm text-muted-foreground">Loading employees…</div>
+        <LoadingText variant="futuristic" text="Loading employees..." />
       </div>
     );
   }
@@ -158,7 +155,7 @@ export default function Employees() {
     return (
       <div className="space-y-6">
         <Header onExport={exportCSV} onAdd={() => setFormMode({ type: "create" })} exporting={exporting} total={pagination?.total} />
-        <Card className="hover-lift">
+        <Card className="card-polished">
           <CardHeader>
             <CardTitle>Filters</CardTitle>
           </CardHeader>
@@ -187,7 +184,7 @@ export default function Employees() {
         total={pagination?.total}
       />
 
-      <Card className="hover-lift">
+      <Card className="card-premium">
         <CardHeader>
           <CardTitle>Filters</CardTitle>
         </CardHeader>
@@ -204,7 +201,6 @@ export default function Employees() {
           allEmployees={allEmployees}
           onEdit={handleEdit}
           onDelete={handleDelete}
-          onView={handleView}
           // If your table supports pagination props, pass them here:
           // page={pagination.page} onPageChange={setPage} pageSize={pagination.limit}
         />
@@ -273,11 +269,11 @@ function Header({
         </p>
       </div>
       <div className="flex gap-2">
-        <Button variant="outline" onClick={onExport} disabled={exporting}>
+        <Button variant="outline" onClick={onExport} disabled={exporting} className="btn-outline-polished">
           <Download className="mr-2 h-4 w-4" />
           {exporting ? "Exporting…" : "Export CSV"}
         </Button>
-        <Button className="bg-gradient-primary hover:opacity-90" onClick={onAdd}>
+        <Button className="btn-primary-polished" onClick={onAdd}>
           <UserPlus className="mr-2 h-4 w-4" />
           Add Employee
         </Button>
@@ -288,12 +284,12 @@ function Header({
 
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
-    <Card className="hover-lift">
+    <Card className="card-premium">
       <CardContent className="py-12 text-center">
         <div className="text-lg font-medium">No employees found</div>
         <p className="text-muted-foreground mt-1">Start by adding your first employee.</p>
         <div className="mt-4">
-          <Button className="bg-gradient-primary hover:opacity-90" onClick={onAdd}>
+          <Button className="btn-primary-polished" onClick={onAdd}>
             <UserPlus className="mr-2 h-4 w-4" />
             Add Employee
           </Button>

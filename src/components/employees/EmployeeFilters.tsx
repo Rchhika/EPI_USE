@@ -58,9 +58,9 @@ export default function EmployeeFiltersComponent({ filters, onFiltersChange }: E
       {/* Quick Role Filter */}
       <Select value={toSelectValue(filters.role)} onValueChange={(value) => updateFilter('role', value === 'all' ? undefined : value)}>
         <SelectTrigger className="w-48">
-          <SelectValue placeholder="Any role" />
+          <SelectValue placeholder="Any role" className="truncate text-center" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent position="popper">
           <SelectItem value="all">All roles</SelectItem>
           {EMPLOYEE_ROLES.map((role) => (
             <SelectItem key={role} value={role}>
@@ -73,7 +73,7 @@ export default function EmployeeFiltersComponent({ filters, onFiltersChange }: E
       {/* Advanced Filters */}
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
-          <Button variant="outline" className="relative">
+          <Button variant="outline" className="relative btn-outline-polished">
             <Filter className="mr-2 h-4 w-4" />
             Filters
             {hasActiveFilters && (
@@ -82,7 +82,7 @@ export default function EmployeeFiltersComponent({ filters, onFiltersChange }: E
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-80 p-0" align="end">
-          <Card className="border-0 shadow-none">
+          <Card className="border-0 shadow-none card-premium">
             <div className="p-6 space-y-6">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Advanced Filters</h3>
@@ -133,6 +133,7 @@ export default function EmployeeFiltersComponent({ filters, onFiltersChange }: E
                       onChange={(e) => 
                         updateFilter('salaryMin', e.target.value ? Number(e.target.value) : undefined)
                       }
+                      className="input-solid"
                     />
                   </div>
                   <div>
@@ -145,6 +146,7 @@ export default function EmployeeFiltersComponent({ filters, onFiltersChange }: E
                       onChange={(e) => 
                         updateFilter('salaryMax', e.target.value ? Number(e.target.value) : undefined)
                       }
+                      className="input-solid"
                     />
                   </div>
                 </div>
@@ -163,6 +165,7 @@ export default function EmployeeFiltersComponent({ filters, onFiltersChange }: E
                       onChange={(e) => 
                         updateFilter('birthDateFrom', e.target.value ? new Date(e.target.value) : undefined)
                       }
+                      className="input-solid"
                     />
                   </div>
                   <div>
@@ -174,6 +177,7 @@ export default function EmployeeFiltersComponent({ filters, onFiltersChange }: E
                       onChange={(e) => 
                         updateFilter('birthDateTo', e.target.value ? new Date(e.target.value) : undefined)
                       }
+                      className="input-solid"
                     />
                   </div>
                 </div>

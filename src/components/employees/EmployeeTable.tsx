@@ -26,7 +26,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ArrowUpDown, MoreHorizontal, Edit, Trash2, Eye } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import { getGravatarUrl, getInitials } from '@/utils/gravatar';
 import { format } from 'date-fns';
 
@@ -35,15 +35,13 @@ interface EmployeeTableProps {
   allEmployees: Employee[];
   onEdit: (employee: Employee) => void;
   onDelete: (employee: Employee) => void;
-  onView: (employee: Employee) => void;
 }
 
 export default function EmployeeTable({ 
   data, 
   allEmployees, 
   onEdit, 
-  onDelete, 
-  onView 
+  onDelete 
 }: EmployeeTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
 
@@ -198,10 +196,6 @@ export default function EmployeeTable({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => onView(employee)}>
-                <Eye className="mr-2 h-4 w-4" />
-                View Details
-              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onEdit(employee)}>
                 <Edit className="mr-2 h-4 w-4" />
                 Edit Employee
