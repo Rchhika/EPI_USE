@@ -13,6 +13,12 @@ export const listEmployees = (
       )
   ).then((r) => ({ ...r, data: r.data.map(parseEmployee) }));
 
+/* ---------- List All for Org Chart ---------- */
+export const listAllEmployeesForOrg = () =>
+  jsonFetch<any[]>(`/employees/all-for-org`).then((data) => 
+    data.map(parseEmployee)
+  );
+
 /* ---------- Create ---------- */
 export const createEmployee = (body: EmployeeCreateInput) =>
   jsonFetch<any>(`/employees`, {

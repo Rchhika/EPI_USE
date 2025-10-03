@@ -39,6 +39,54 @@ export async function listEmployees(req: Request, res: Response, next: NextFunct
   } catch (e) { next(e); }
 }
 
+// -------------------- LIST ALL FOR ORG CHART --------------------
+export async function listAllEmployeesForOrg(req: Request, res: Response, next: NextFunction) {
+  try {
+    // Get all employees with minimal fields for org chart
+    const employees = await Employee.find({})
+      .select('_id firstName surname email role employeeNumber manager createdAt')
+      .sort({ role: 1, createdAt: 1 })
+      .lean();
+
+    // Process employees to handle manager references and validate data
+    const processedEmployees = employees.map(emp => {
+      const processed = {
+        id: emp._id.toString(),
+        name: emp.firstName,
+        surname: emp.surname,
+        email: emp.email,
+        role: emp.role,
+        employeeNumber: emp.employeeNumber,
+        manager: null as string | null,
+        createdAt: emp.createdAt,
+      };
+
+      // Handle manager field - convert ObjectId to employeeNumber if needed
+      if (emp.manager) {
+        // If manager is an ObjectId, we need to find the corresponding employeeNumber
+        if (mongoose.Types.ObjectId.isValid(emp.manager)) {
+          const managerEmp = employees.find(e => e._id.toString() === emp.manager?.toString());
+          if (managerEmp) {
+            processed.manager = managerEmp.employeeNumber;
+          }
+        } else {
+          // If manager is already an employeeNumber, use it directly
+          processed.manager = String(emp.manager);
+        }
+      }
+
+      // Validate: never allow manager === own employeeNumber
+      if (processed.manager === processed.employeeNumber) {
+        processed.manager = null;
+      }
+
+      return processed;
+    });
+
+    res.json(processedEmployees);
+  } catch (e) { next(e); }
+}
+
 // -------------------- GET BY ID --------------------
 export async function getEmployeeById(req: Request, res: Response, next: NextFunction) {
   try {

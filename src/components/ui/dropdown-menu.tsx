@@ -61,7 +61,7 @@ const DropdownMenuContent = React.forwardRef<
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
-        "dropdown-content",
+        "dropdown-content dropdown-futuristic",
         className,
       )}
       {...props}
@@ -141,7 +141,7 @@ const DropdownMenuLabel = React.forwardRef<
 >(({ className, inset, ...props }, ref) => (
   <DropdownMenuPrimitive.Label
     ref={ref}
-    className={cn("px-2 py-1.5 text-sm font-semibold", inset && "pl-8", className)}
+    className={cn("px-3 py-2 text-sm font-semibold text-card-foreground bg-muted/50", inset && "pl-8", className)}
     {...props}
   />
 ));
