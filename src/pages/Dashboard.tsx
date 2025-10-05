@@ -118,14 +118,14 @@ export default function Dashboard() {
         <KpiCard
           className="xl:col-span-2"
           title="Avg Salary"
-          value={isLoading ? '—' : `$${formatMoney(avgSalary)}`}
+          value={isLoading ? '—' : `R${formatMoney(avgSalary)}`}
           sub="Weighted by current employees"
           icon="💵"
         />
         <KpiCard
           className="xl:col-span-2"
           title="Total Payroll"
-          value={isLoading ? '—' : `$${formatMoney(totalPayroll)}`}
+          value={isLoading ? '—' : `R${formatMoney(totalPayroll)}`}
           sub="(annual total)"
           icon="📈"
         />

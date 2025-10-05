@@ -173,8 +173,15 @@ export default function EmployeeFormDialog({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <Label>Salary</Label>
-              <Input type="number" step="1" inputMode="numeric" {...form.register("salary")} className="input-solid" />
+              <Label>Salary (R)</Label>
+              <Input 
+                type="number" 
+                step="1" 
+                inputMode="numeric" 
+                placeholder="e.g. 50000"
+                {...form.register("salary")} 
+                className="input-solid" 
+              />
               <FieldError msg={form.formState.errors.salary?.message?.toString()} />
             </div>
             <div>

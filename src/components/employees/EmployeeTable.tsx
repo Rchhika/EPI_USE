@@ -152,9 +152,9 @@ export default function EmployeeTable({
       ),
       cell: ({ row }) => {
         const amount = parseFloat(row.getValue('salary'));
-        const formatted = new Intl.NumberFormat('en-US', {
+        const formatted = new Intl.NumberFormat('en-ZA', {
           style: 'currency',
-          currency: 'USD',
+          currency: 'ZAR',
         }).format(amount);
 
         return <div className="text-sm font-medium">{formatted}</div>;
