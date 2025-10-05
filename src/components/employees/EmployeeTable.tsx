@@ -47,7 +47,7 @@ export default function EmployeeTable({
 
   const getManagerName = (managerId?: string) => {
     if (!managerId) return 'No Manager';
-    const manager = allEmployees.find(emp => emp.id === managerId);
+    const manager = allEmployees.find(emp => emp.employeeNumber === managerId);
     return manager ? `${manager.name} ${manager.surname}` : 'Unknown';
   };
 
