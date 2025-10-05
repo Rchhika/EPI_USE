@@ -40,12 +40,17 @@ export async function listEmployees(req: Request, res: Response, next: NextFunct
       : {};
 
     const [data, total] = await Promise.all([
-      Employee.find(filter).sort(sort).skip((page - 1) * limit).limit(limit).lean(),
+      Employee.find(filter)
+        .populate('manager', 'employeeNumber firstName surname')
+        .sort(sort)
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
       Employee.countDocuments(filter),
     ]);
 
     // Process employees to handle manager references properly
-    const processedData = await Promise.all(data.map(async (emp) => {
+    const processedData = data.map((emp) => {
       const processed = {
         ...emp,
         id: emp._id.toString(),
@@ -53,18 +58,13 @@ export async function listEmployees(req: Request, res: Response, next: NextFunct
         manager: null as string | null,
       };
 
-      // Handle manager field - convert ObjectId to employeeNumber if needed
-      if (emp.manager) {
-        if (mongoose.Types.ObjectId.isValid(emp.manager)) {
-          // Find the manager by ObjectId and get their employeeNumber
-          const managerEmp = await Employee.findById(emp.manager).select('employeeNumber').lean();
-          if (managerEmp) {
-            processed.manager = managerEmp.employeeNumber;
-          }
-        } else {
-          // If manager is already an employeeNumber, use it directly
-          processed.manager = String(emp.manager);
-        }
+      // Handle manager field - convert populated manager to employeeNumber
+      if (emp.manager && typeof emp.manager === 'object') {
+        // Manager was populated, use the employeeNumber
+        processed.manager = emp.manager.employeeNumber;
+      } else if (emp.manager) {
+        // Manager is a string (employeeNumber), use it directly
+        processed.manager = String(emp.manager);
       }
 
       // Validate: never allow manager === own employeeNumber
@@ -73,7 +73,7 @@ export async function listEmployees(req: Request, res: Response, next: NextFunct
       }
 
       return processed;
-    }));
+    });
 
     res.json({ data: processedData, total, page, limit });
   } catch (e) { next(e); }
