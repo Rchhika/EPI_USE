@@ -215,8 +215,19 @@ export async function updateEmployee(req: Request, res: Response, next: NextFunc
 // -------------------- DELETE --------------------
 export async function deleteEmployee(req: Request, res: Response, next: NextFunction) {
   try {
-    const doc = await Employee.findByIdAndDelete(req.params.id);
+    const { id } = req.params;
+    
+    // First, update all employees who have this employee as their manager
+    // Set their manager to null (no manager) instead of leaving it as a dangling reference
+    await Employee.updateMany(
+      { manager: id },
+      { $unset: { manager: 1 } }
+    );
+    
+    // Now delete the employee
+    const doc = await Employee.findByIdAndDelete(id);
     if (!doc) return res.status(404).json({ message: 'Employee not found' });
+    
     res.status(204).send();
   } catch (e) { next(e); }
 }
