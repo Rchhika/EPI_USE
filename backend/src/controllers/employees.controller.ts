@@ -40,11 +40,42 @@ export async function listEmployees(req: Request, res: Response, next: NextFunct
       : {};
 
     const [data, total] = await Promise.all([
-      Employee.find(filter).sort(sort).skip((page - 1) * limit).limit(limit),
+      Employee.find(filter).sort(sort).skip((page - 1) * limit).limit(limit).lean(),
       Employee.countDocuments(filter),
     ]);
 
-    res.json({ data, total, page, limit });
+    // Process employees to handle manager references properly
+    const processedData = await Promise.all(data.map(async (emp) => {
+      const processed = {
+        ...emp,
+        id: emp._id.toString(),
+        name: emp.firstName,
+        manager: null as string | null,
+      };
+
+      // Handle manager field - convert ObjectId to employeeNumber if needed
+      if (emp.manager) {
+        if (mongoose.Types.ObjectId.isValid(emp.manager)) {
+          // Find the manager by ObjectId and get their employeeNumber
+          const managerEmp = await Employee.findById(emp.manager).select('employeeNumber').lean();
+          if (managerEmp) {
+            processed.manager = managerEmp.employeeNumber;
+          }
+        } else {
+          // If manager is already an employeeNumber, use it directly
+          processed.manager = String(emp.manager);
+        }
+      }
+
+      // Validate: never allow manager === own employeeNumber
+      if (processed.manager === processed.employeeNumber) {
+        processed.manager = null;
+      }
+
+      return processed;
+    }));
+
+    res.json({ data: processedData, total, page, limit });
   } catch (e) { next(e); }
 }
 
