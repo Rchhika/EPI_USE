@@ -5,8 +5,10 @@ type Props = { children: React.ReactElement };
 
 export default function ProtectedRoute({ children }: Props) {
   const { isAuthed, isLoading } = useAuth();
+  
   if (isLoading) return <div className="p-6">Loading…</div>;
   if (!isAuthed) return <Navigate to="/login" replace />;
+  
   return children;
 }
 

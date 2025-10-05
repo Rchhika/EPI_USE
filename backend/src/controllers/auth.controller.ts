@@ -15,7 +15,7 @@ function authCookieOptions(maxAgeMs: number) {
   return {
     httpOnly: true,
     secure: isProd,                         // HTTPS in prod
-    sameSite: (isProd ? 'none' : 'lax') as 'none' | 'lax', // <-- key fix
+    sameSite: 'lax' as 'lax',              // Safari-compatible: always use 'lax'
     maxAge: maxAgeMs,
     path: '/',
   };
@@ -47,7 +47,7 @@ export async function logout(_req: Request, res: Response) {
   res.clearCookie('auth_token', {
     httpOnly: true,
     secure: isProd,
-    sameSite: (isProd ? 'none' : 'lax') as 'none' | 'lax',
+    sameSite: 'lax' as 'lax',              // Safari-compatible: always use 'lax'
     path: '/',
   });
   return res.status(204).send();

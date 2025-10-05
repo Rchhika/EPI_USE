@@ -33,7 +33,11 @@ export default function Login() {
     try {
       await login(values.email, values.password);
       await queryClient.invalidateQueries({ queryKey: ['me'] });
-      navigate('/employees');
+      
+      // Safari-specific navigation fix: use setTimeout to ensure state updates
+      setTimeout(() => {
+        navigate('/employees');
+      }, 100);
     } catch (err: any) {
       const message = err?.message || 'Login failed';
       toast({ title: 'Login failed', description: message, variant: 'destructive' });
