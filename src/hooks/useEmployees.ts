@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query';
 import {
   listEmployees,
+  listAllEmployeesForOrg,
   createEmployee,
   updateEmployee,
   deleteEmployee,
@@ -62,7 +63,15 @@ export function useEmployees() {
     placeholderData: keepPreviousData,
   });
 
+  // Fetch all employees for manager lookup (separate from search results)
+  const allEmployeesQuery = useQuery({
+    queryKey: ['employees-all'],
+    queryFn: listAllEmployeesForOrg,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+
   const rows = query.data?.data ?? [];
+  const allEmployees = allEmployeesQuery.data ?? [];
 
   // Local filtering (UI filters beyond the server's search)
   const employees = useMemo(() => {
@@ -120,13 +129,13 @@ export function useEmployees() {
 
   return {
     // query state
-    isLoading: query.isLoading,
+    isLoading: query.isLoading || allEmployeesQuery.isLoading,
     isFetching: query.isFetching,
     error: query.error as unknown,
 
     // data
     employees,
-    allEmployees: rows,
+    allEmployees,
     total, // <— expose this for the Dashboard KPI
 
     // pagination
