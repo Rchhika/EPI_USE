@@ -11,6 +11,7 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import { ToastProvider } from "./contexts/ToastContext";
+import { ConfirmationProvider } from "./contexts/ConfirmationContext";
 
 const queryClient = new QueryClient();
 
@@ -18,9 +19,10 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <ToastProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
+        <ConfirmationProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route
@@ -56,6 +58,7 @@ const App = () => (
           <Route path="*" element={<NotFound />} />
         </Routes>
         </BrowserRouter>
+        </ConfirmationProvider>
       </ToastProvider>
     </TooltipProvider>
   </QueryClientProvider>

@@ -10,12 +10,14 @@ import { useEmployees } from "@/hooks/useEmployees";
 import type { Employee } from "@/types/employee";
 import EmployeeFormDialog, { EmployeeFormValues } from "@/components/employees/EmployeeFormDialog";
 import { useToastContext } from "@/contexts/ToastContext";
+import { useConfirmationContext } from "@/contexts/ConfirmationContext";
 
 type Mode = { type: "create" } | { type: "edit"; employee: Employee } | null;
 
 export default function Employees() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToastContext();
+  const { confirm } = useConfirmationContext();
   
   const {
     isLoading,
@@ -62,7 +64,7 @@ export default function Employees() {
     };
     // simple client-side guard for employeeNumber
     if (!body.employeeNumber?.trim()) {
-      alert("Employee number is required");
+      toast.error("Validation Error", "Employee number is required");
       return;
     }
     
@@ -89,7 +91,7 @@ export default function Employees() {
       manager: vals.manager === "__none__" ? undefined : vals.manager,
     };
     if (!body.employeeNumber?.trim()) {
-      alert("Employee number is required");
+      toast.error("Validation Error", "Employee number is required");
       return;
     }
     
@@ -114,23 +116,27 @@ export default function Employees() {
   };
 
   const handleDelete = async (employee: Employee) => {
-    if (!confirm(`Delete ${employee.name} ${employee.surname}?`)) return;
-    
-    try {
-      await deleteEmployee(employee.id);
-      await refetch();
-      
-      // Show awesome delete toast
-      toast.delete(
-        "Employee Deleted Successfully! 🗑️",
-        `${employee.name} ${employee.surname} has been removed from the system.`
-      );
-    } catch (error) {
-      toast.error(
-        "Delete Failed",
-        "There was an error deleting the employee. Please try again."
-      );
-    }
+    confirm.delete(
+      "Delete Employee",
+      `Are you sure you want to delete ${employee.name} ${employee.surname}? This action cannot be undone.`,
+      async () => {
+        try {
+          await deleteEmployee(employee.id);
+          await refetch();
+          
+          // Show awesome delete toast
+          toast.delete(
+            "Employee Deleted Successfully! 🗑️",
+            `${employee.name} ${employee.surname} has been removed from the system.`
+          );
+        } catch (error) {
+          toast.error(
+            "Delete Failed",
+            "There was an error deleting the employee. Please try again."
+          );
+        }
+      }
+    );
   };
 
 
@@ -139,7 +145,7 @@ export default function Employees() {
       setExporting(true);
       const rows: Employee[] = employees ?? [];
       if (!rows.length) {
-        alert("No employees to export.");
+        toast.warning("No Data", "No employees to export.");
         return;
       }
       const header = [

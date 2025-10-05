@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmployeeAvatar } from "@/components/ui/avatar";
 import { EMPLOYEE_ROLES } from "@/types/employee";
+import { useToastContext } from "@/contexts/ToastContext";
 
 /**
  * IMPORTANT:
@@ -46,6 +47,7 @@ type Props = {
 export default function EmployeeFormDialog({
   open, onOpenChange, title, managers, submitting, onSubmit, defaultValues
 }: Props) {
+  const { toast } = useToastContext();
   const form = useForm<EmployeeFormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -101,7 +103,7 @@ export default function EmployeeFormDialog({
         if (/employee number/i.test(msg)) {
           form.setError('employeeNumber', { type: 'manual', message: msg });
         } else {
-          alert(msg);
+          toast.error("Save Failed", msg);
         }
         console.error('Create/Update failed:', err);
       }
