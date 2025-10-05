@@ -59,9 +59,10 @@ export async function listEmployees(req: Request, res: Response, next: NextFunct
       };
 
       // Handle manager field - convert populated manager to employeeNumber
-      if (emp.manager && typeof emp.manager === 'object') {
+      if (emp.manager && typeof emp.manager === 'object' && emp.manager !== null) {
         // Manager was populated, use the employeeNumber
-        processed.manager = emp.manager.employeeNumber;
+        const managerObj = emp.manager as any; // Type assertion for populated object
+        processed.manager = managerObj.employeeNumber;
       } else if (emp.manager) {
         // Manager is a string (employeeNumber), use it directly
         processed.manager = String(emp.manager);
