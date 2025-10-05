@@ -9,11 +9,13 @@ import { LoadingText } from "@/components/ui/loading";
 import { useEmployees } from "@/hooks/useEmployees";
 import type { Employee } from "@/types/employee";
 import EmployeeFormDialog, { EmployeeFormValues } from "@/components/employees/EmployeeFormDialog";
+import { useToastContext } from "@/contexts/ToastContext";
 
 type Mode = { type: "create" } | { type: "edit"; employee: Employee } | null;
 
 export default function Employees() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { toast } = useToastContext();
   
   const {
     isLoading,
@@ -63,8 +65,21 @@ export default function Employees() {
       alert("Employee number is required");
       return;
     }
-    await createEmployee(body);  // will throw if backend returns error -> dialog catches it
-    await refetch();
+    
+    try {
+      await createEmployee(body);
+      await refetch();
+      
+      toast.create(
+        "Employee Created Successfully! ✨",
+        `${body.name} ${body.surname} has been added to the system.`
+      );
+    } catch (error) {
+      toast.error(
+        "Create Failed",
+        "There was an error creating the employee. Please try again."
+      );
+    }
   };
   const handleUpdate = async (employee: Employee, vals: EmployeeFormValues) => {
     const body = {
@@ -77,8 +92,21 @@ export default function Employees() {
       alert("Employee number is required");
       return;
     }
-    await updateEmployee({ id: employee.id, ...body }); // will throw on 409 duplicate, etc.
-    await refetch();
+    
+    try {
+      await updateEmployee({ id: employee.id, ...body });
+      await refetch();
+      
+      toast.update(
+        "Employee Updated Successfully! 🔄",
+        `${body.name} ${body.surname}'s information has been updated.`
+      );
+    } catch (error) {
+      toast.error(
+        "Update Failed",
+        "There was an error updating the employee. Please try again."
+      );
+    }
   };
 
   const handleEdit = (employee: Employee) => {
@@ -87,8 +115,22 @@ export default function Employees() {
 
   const handleDelete = async (employee: Employee) => {
     if (!confirm(`Delete ${employee.name} ${employee.surname}?`)) return;
-    await deleteEmployee(employee.id);
-    await refetch();
+    
+    try {
+      await deleteEmployee(employee.id);
+      await refetch();
+      
+      // Show awesome delete toast
+      toast.delete(
+        "Employee Deleted Successfully! 🗑️",
+        `${employee.name} ${employee.surname} has been removed from the system.`
+      );
+    } catch (error) {
+      toast.error(
+        "Delete Failed",
+        "There was an error deleting the employee. Please try again."
+      );
+    }
   };
 
 
@@ -135,6 +177,16 @@ export default function Employees() {
       a.download = "employees.csv";
       a.click();
       URL.revokeObjectURL(url);
+      
+      toast.success(
+        "CSV Export Complete! 📊",
+        `${rows.length} employees exported successfully.`
+      );
+    } catch (error) {
+      toast.error(
+        "Export Failed",
+        "There was an error exporting the data. Please try again."
+      );
     } finally {
       setExporting(false);
     }
@@ -212,8 +264,6 @@ export default function Employees() {
           allEmployees={allEmployees}
           onEdit={handleEdit}
           onDelete={handleDelete}
-          // If your table supports pagination props, pass them here:
-          // page={pagination.page} onPageChange={setPage} pageSize={pagination.limit}
         />
       )}
 
@@ -298,13 +348,6 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
     <Card className="card-premium">
       <CardContent className="py-12 text-center">
         <div className="text-lg font-medium">No employees found</div>
-        <p className="text-muted-foreground mt-1">Start by adding your first employee.</p>
-        <div className="mt-4">
-          <Button className="btn-primary-polished" onClick={onAdd}>
-            <UserPlus className="mr-2 h-4 w-4" />
-            Add Employee
-          </Button>
-        </div>
       </CardContent>
     </Card>
   );

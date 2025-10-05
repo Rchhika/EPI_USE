@@ -10,15 +10,17 @@ import OrgChart from "./pages/OrgChart";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import ProtectedRoute from "./routes/ProtectedRoute";
+import { ToastProvider } from "./contexts/ToastContext";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
+      <ToastProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route
@@ -53,7 +55,8 @@ const App = () => (
           />
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </BrowserRouter>
+        </BrowserRouter>
+      </ToastProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
