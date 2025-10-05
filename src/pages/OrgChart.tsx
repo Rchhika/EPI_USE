@@ -40,18 +40,36 @@ import { toast } from 'sonner';
 const NODE_WIDTH = 200;
 const NODE_HEIGHT = 80;
 
-// Role color mapping
-const ROLE_COLORS: Record<string, string> = {
-  'CEO': 'bg-gradient-to-r from-purple-500 to-purple-600',
-  'CTO': 'bg-gradient-to-r from-blue-500 to-blue-600',
-  'CFO': 'bg-gradient-to-r from-green-500 to-green-600',
-  'VP': 'bg-gradient-to-r from-orange-500 to-orange-600',
-  'Director': 'bg-gradient-to-r from-pink-500 to-pink-600',
-  'Manager': 'bg-gradient-to-r from-indigo-500 to-indigo-600',
-  'Senior': 'bg-gradient-to-r from-teal-500 to-teal-600',
-  'Junior': 'bg-gradient-to-r from-gray-500 to-gray-600',
-  'Intern': 'bg-gradient-to-r from-yellow-500 to-yellow-600',
+// Dynamic role color mapping based on actual database roles
+const generateRoleColors = (roles: readonly string[]) => {
+  const colors = [
+    'bg-gradient-to-r from-purple-500 to-purple-600',    // CEO
+    'bg-gradient-to-r from-blue-500 to-blue-600',        // CTO
+    'bg-gradient-to-r from-green-500 to-green-600',       // VP Engineering
+    'bg-gradient-to-r from-orange-500 to-orange-600',    // Engineering Manager
+    'bg-gradient-to-r from-teal-500 to-teal-600',         // Senior Software Engineer
+    'bg-gradient-to-r from-indigo-500 to-indigo-600',    // Software Engineer
+    'bg-gradient-to-r from-gray-500 to-gray-600',         // Junior Software Engineer
+    'bg-gradient-to-r from-pink-500 to-pink-600',        // Product Manager
+    'bg-gradient-to-r from-rose-500 to-rose-600',        // Senior Product Manager
+    'bg-gradient-to-r from-cyan-500 to-cyan-600',        // Designer
+    'bg-gradient-to-r from-emerald-500 to-emerald-600',  // Senior Designer
+    'bg-gradient-to-r from-amber-500 to-amber-600',      // Marketing Manager
+    'bg-gradient-to-r from-red-500 to-red-600',          // Sales Manager
+    'bg-gradient-to-r from-violet-500 to-violet-600',    // HR Manager
+    'bg-gradient-to-r from-lime-500 to-lime-600',        // Finance Manager
+    'bg-gradient-to-r from-yellow-500 to-yellow-600',    // Intern
+  ];
+  
+  const roleColors: Record<string, string> = {};
+  roles.forEach((role, index) => {
+    roleColors[role] = colors[index % colors.length];
+  });
+  
+  return roleColors;
 };
+
+const ROLE_COLORS = generateRoleColors(EMPLOYEE_ROLES);
 
 const getRoleColor = (role: string) => ROLE_COLORS[role] || 'bg-gradient-to-r from-gray-500 to-gray-600';
 
